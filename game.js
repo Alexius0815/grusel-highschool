@@ -2,7 +2,7 @@
 (() => {
 'use strict';
 const { Engine, Bodies, Body, Composite, Constraint, Events, Query } = Matter;
-const VERSION = 7;
+const VERSION = 8;
 const $ = id => document.getElementById(id);
 const PI = Math.PI, rnd = (a, b) => a + Math.random() * (b - a), pick = a => a[Math.floor(Math.random() * a.length)];
 
@@ -51,6 +51,10 @@ const T = {
   'kind.sea': { de: 'Meeresmonster', en: 'Sea monster', hu: 'Tengeri szörny' },
   'kind.ghost': { de: 'Geist', en: 'Ghost', hu: 'Szellem' },
   'kind.mummy': { de: 'Mumie', en: 'Mummy', hu: 'Múmia' },
+  'kind.cat': { de: 'Katze', en: 'Cat', hu: 'Macska' },
+  'kind.devil': { de: 'Teufelchen', en: 'Little devil', hu: 'Ördögfióka' },
+  'kind.bat': { de: 'Fledermaus', en: 'Bat', hu: 'Denevér' },
+  'kind.alien': { de: 'Alien', en: 'Alien', hu: 'Földönkívüli' },
   'cr.skin': { de: 'Hautfarbe', en: 'Skin', hu: 'Bőrszín' },
   'cr.hair': { de: 'Haarfarbe', en: 'Hair colour', hu: 'Hajszín' },
   'cr.streak': { de: 'Strähne', en: 'Streak', hu: 'Tincs' },
@@ -104,12 +108,12 @@ if (!T.title[lang]) lang = 'en';
 const tr = (k, arg) => { const e = T[k]; let s = e ? (e[lang] || e.en) : k; return arg != null ? s.replace('%@', arg) : s; };
 
 // ---------------------------------------------------------------- Ghoul-Modell
-const KINDS = ['vampire', 'wolf', 'stitch', 'sea', 'ghost', 'mummy'];
+const KINDS = ['vampire', 'wolf', 'stitch', 'sea', 'ghost', 'mummy', 'cat', 'devil', 'bat', 'alien'];
 const HAIRS = ['long', 'short', 'pigtails'], TOPS = ['dress', 'shirt', 'jacket'], BOTTOMS = ['skirt', 'pants', 'tutu'];
 const SHOES = ['platform', 'boots', 'sneakers'], ACCS = ['none', 'bow', 'crown', 'hat', 'glasses'];
-const EMOJI = { vampire: '🧛‍♀️', wolf: '🐺', stitch: '🧟‍♀️', sea: '🧜‍♀️', ghost: '👻', mummy: '🏺' };
-const SKIN = ['#F6E4F0', '#F4F6FF', '#E9D9B0', '#FFD7B5', '#C9956B', '#8D5A3B', '#9FE3C8', '#7FD6E8', '#B9A6FF', '#FFB3D9', '#A8E06C', '#9E9E9E'];
-const COLORS = ['#111111', '#FFFFFF', '#FF4FA3', '#E0207F', '#7B2CBF', '#9D7BFF', '#3B6FD8', '#38D1C1', '#2EC4B6', '#8CFF4F', '#FFE066', '#FF8A1F', '#FF3B3B', '#5A3420', '#D4AF37', '#1E8C8C'];
+const EMOJI = { vampire: '🧛‍♀️', wolf: '🐺', stitch: '🧟‍♀️', sea: '🧜‍♀️', ghost: '👻', mummy: '🏺', cat: '🐱', devil: '😈', bat: '🦇', alien: '👽' };
+const SKIN = ['#FFE3EC', '#E6DDF7', '#BFE9FF', '#F6E4F0', '#F4F6FF', '#E9D9B0', '#FFD7B5', '#C9956B', '#8D5A3B', '#9FE3C8', '#7FD6E8', '#B9A6FF', '#FFB3D9', '#A8E06C', '#9E9E9E'];
+const COLORS = ['#111111', '#FFFFFF', '#FF4FA3', '#E0207F', '#7B2CBF', '#9D7BFF', '#3B6FD8', '#38D1C1', '#2EC4B6', '#8CFF4F', '#FFE066', '#FF8A1F', '#FF3B3B', '#5A3420', '#D4AF37', '#1E8C8C', '#FFB3D9', '#3B2A4F'];
 const LIPS = ['#C2185B', '#FF4FA3', '#7B2CBF', '#1565C0', '#8E3B2F', '#111111', '#2E7D6B', '#FF3B3B'];
 const G = (id, name, kind, skin, hair, streak, eyes, lips, top, bottom, accent, hairStyle, topStyle, bottomStyle, shoes, accessory) =>
   ({ id, name, kind, skin, hair, streak, eyes, lips, top, bottom, accent, hairStyle, topStyle, bottomStyle, shoes, accessory });
@@ -121,6 +125,12 @@ const BUILTIN = [
   G('b4', 'Neris', 'sea', '#A8E06C', '#3B6FD8', '#FF4FA3', '#FF8A1F', '#1565C0', '#FF8A1F', '#FFE066', '#FF4FA3', 'pigtails', 'shirt', 'skirt', 'sneakers', 'none'),
   G('b5', 'Boo-Belle', 'ghost', '#F4F6FF', '#38D1C1', '#FFFFFF', '#2E86FF', '#FF4FA3', '#FF4FA3', '#FFFFFF', '#111111', 'long', 'dress', 'skirt', 'platform', 'hat'),
   G('b6', 'Mumi', 'mummy', '#E9D9B0', '#C9956B', '#FF4FA3', '#8CFF4F', '#C2185B', '#3B6FD8', '#FFFFFF', '#FF4FA3', 'short', 'shirt', 'tutu', 'boots', 'bow'),
+  G('b7', 'Mimi', 'cat', '#FFE3EC', '#FFB3D9', '#FFFFFF', '#7B2CBF', '#FF4FA3', '#FFE066', '#FF4FA3', '#FF4FA3', 'pigtails', 'dress', 'tutu', 'sneakers', 'bow'),
+  G('b8', 'Pepper', 'devil', '#FFD7B5', '#E0207F', '#FFE066', '#FF3B3B', '#C2185B', '#111111', '#E0207F', '#FFE066', 'short', 'jacket', 'skirt', 'boots', 'none'),
+  G('b9', 'Fledi', 'bat', '#E6DDF7', '#3B2A4F', '#9D7BFF', '#FFE066', '#7B2CBF', '#9D7BFF', '#3B2A4F', '#FFE066', 'short', 'shirt', 'pants', 'sneakers', 'glasses'),
+  G('b10', 'Zip', 'alien', '#A8E06C', '#38D1C1', '#FFFFFF', '#1E8C8C', '#2E7D6B', '#FFFFFF', '#3B6FD8', '#38D1C1', 'pigtails', 'shirt', 'tutu', 'platform', 'none'),
+  G('b11', 'Perla', 'sea', '#BFE9FF', '#FF4FA3', '#FFE066', '#2E86FF', '#C2185B', '#38D1C1', '#9D7BFF', '#FFFFFF', 'long', 'dress', 'skirt', 'sneakers', 'crown'),
+  G('b12', 'Wölkchen', 'ghost', '#FFFFFF', '#FFB3D9', '#9D7BFF', '#3B6FD8', '#FF4FA3', '#BFE9FF', '#FFB3D9', '#FF4FA3', 'pigtails', 'dress', 'tutu', 'platform', 'bow'),
 ];
 let custom = load('customGhouls') || [];
 let deleted = [];
@@ -159,7 +169,7 @@ function drawTorso(c, s) {
     poly(c, [[7, -23], [0, -10], [12, -23]], s.accent, INK, 1);
     segs(c, [[-7, -22, -7, 24], [7, -22, 7, 24]], INK, 1.5);
   }
-  const sym = { vampire: '♥', wolf: '☾', sea: '✦', ghost: '☁' }[s.kind] || '☠';
+  const sym = { vampire: '♥', wolf: '☾', sea: '✦', ghost: '☁', cat: '✿', devil: '♥', bat: '☾', alien: '★' }[s.kind] || '☠';
   txt(c, sym, 0, -5, 13, s.topStyle === 'jacket' ? INK : s.accent);
   if (s.bottomStyle === 'skirt') {
     poly(c, [[-17, 16], [17, 16], [27, 33], [-27, 33]], s.bottom, INK, 2.5);
@@ -171,6 +181,12 @@ function drawTorso(c, s) {
     poly(c, pts.map(p => [p[0] * 0.8, p[1] - 4]), alpha(s.accent, 0.5), null, 0);
   } else rr(c, 0, 20, 34, 12, 3, s.bottom, INK, 2);
   if (s.kind === 'mummy') segs(c, [[-17, -18, 17, -10], [-17, -2, 17, 4]], s.skin, 4);
+  if (s.kind === 'cat') {
+    for (const sd of [-1, 1]) { poly(c, [[10 * sd, -21], [25 * sd, -18], [21 * sd, -40]], s.hair, INK, 2); poly(c, [[14 * sd, -22], [22 * sd, -21], [20 * sd, -33]], '#FFB3D9', null, 0); }
+    segs(c, [[-12, 9, -26, 6], [-12, 11, -26, 12], [12, 9, 26, 6], [12, 11, 26, 12]], INK, 1);
+  }
+  if (s.kind === 'devil') for (const sd of [-1, 1]) poly(c, [[9 * sd, -24], [17 * sd, -27], [16 * sd, -40]], '#FF3B3B', INK, 1.5);
+  if (s.kind === 'alien') for (const sd of [-1, 1]) { segs(c, [[8 * sd, -27, 14 * sd, -42]], INK, 2); ell(c, 14 * sd, -44, 8, 8, s.accent, INK, 1.5); }
   if (s.kind === 'stitch') segs(c, [[-12, -20, 12, 12], [-6, -10, 0, -14], [2, -3, 8, -7]], INK, 1.5);
 }
 function drawArm(c, s) {
@@ -201,23 +217,33 @@ function drawHeadBack(c, s) {
     c.restore();
   }
   if (s.kind === 'sea') for (const sd of [-1, 1]) poly(c, [[24 * sd, -8], [38 * sd, -18], [36 * sd, 4], [24 * sd, 6]], s.streak, INK, 2);
+  if (s.kind === 'bat') for (const sd of [-1, 1]) poly(c, [[20 * sd, -14], [48 * sd, -30], [44 * sd, -16], [52 * sd, -6], [40 * sd, -2], [42 * sd, 8], [22 * sd, 2]], s.hair, INK, 2);
 }
 function drawHeadFront(c, s) {
   c.beginPath(); c.arc(0, 0, 26, 0, 2 * PI); paint(c, s.skin, INK, 2.5);
   ell(c, 0, -17, 58, 26, s.hair, INK, 2);
   ell(c, -12, -18, 13, 22, s.streak);
   for (const x of [-10, 10]) {
-    ell(c, x, 0, 13, 16, '#FFFFFF', INK, 1.5);
-    ell(c, x, 1, 9, 9, s.eyes); ell(c, x, 1, 4, 4, INK); ell(c, x + 1.5, -1.5, 2.5, 2.5, '#FFFFFF');
+    ell(c, x, 0, 15, 18, '#FFFFFF', INK, 1.5);
+    ell(c, x, 1.5, 11, 12, s.eyes); ell(c, x, 2, 5, 5.5, INK);
+    ell(c, x + 2, -1.5, 3.6, 3.6, '#FFFFFF'); ell(c, x - 2.2, 4, 1.8, 1.8, '#FFFFFF');
     const d = x < 0 ? -1 : 1;
     segs(c, [[x + 5 * d, -6, x + 9 * d, -9], [x + 2 * d, -8, x + 4 * d, -12]], INK, 1.8);
   }
-  ell(c, 0, 13, 11, 5, s.lips);
+  for (const x of [-17, 17]) ell(c, x, 9, 10, 5.5, 'rgba(255,110,160,.45)');
+  c.beginPath(); c.arc(0, 11.5, 5, 0.1 * PI, 0.9 * PI); c.strokeStyle = s.lips; c.lineWidth = 2.6; c.lineCap = 'round'; c.stroke();
+  ell(c, 0, 15, 3.5, 2, 'rgba(255,110,160,.8)');
   if (s.kind === 'vampire') for (const x of [-3, 3]) poly(c, [[x - 1.8, 14], [x + 1.8, 14], [x, 19]], '#FFFFFF', INK, 0.8);
   if (s.kind === 'wolf') for (const sd of [-1, 1]) {
     poly(c, [[12 * sd, -20], [26 * sd, -22], [22 * sd, -42]], s.hair, INK, 2);
     poly(c, [[15 * sd, -23], [23 * sd, -24], [21 * sd, -35]], '#FF9EC4', null, 0);
   }
+  if (s.kind === 'cat') {
+    for (const sd of [-1, 1]) { poly(c, [[10 * sd, -21], [25 * sd, -18], [21 * sd, -40]], s.hair, INK, 2); poly(c, [[14 * sd, -22], [22 * sd, -21], [20 * sd, -33]], '#FFB3D9', null, 0); }
+    segs(c, [[-12, 9, -26, 6], [-12, 11, -26, 12], [12, 9, 26, 6], [12, 11, 26, 12]], INK, 1);
+  }
+  if (s.kind === 'devil') for (const sd of [-1, 1]) poly(c, [[9 * sd, -24], [17 * sd, -27], [16 * sd, -40]], '#FF3B3B', INK, 1.5);
+  if (s.kind === 'alien') for (const sd of [-1, 1]) { segs(c, [[8 * sd, -27, 14 * sd, -42]], INK, 2); ell(c, 14 * sd, -44, 8, 8, s.accent, INK, 1.5); }
   if (s.kind === 'stitch') segs(c, [[13, 2, 19, 14], [13, 9, 18, 7], [15, 13, 20, 11], [-22, -6, -14, -14], [-21, -12, -17, -8]], INK, 1.5);
   if (s.kind === 'ghost') txt(c, '✦', -22, 14, 10, '#FFFFFF', '10px system-ui');
   if (s.kind === 'mummy') segs(c, [[-25, -4, 25, -10], [-25, 6, -8, 4]], '#FFFFFF', 3);
@@ -584,6 +610,26 @@ function buildBackground() {
 const FX = {
   hall: { bubble: '#8CFF4F' }, forest: { bubble: '#C6FF7A' }, class: { bubble: '#D9A6FF' }, grave: { bubble: '#9FD8FF' },
 };
+// Vordere Ebene: Flüssigkeit über allem, was gerade eintaucht
+function drawFixturesFront(c) {
+  const { x, y } = cauldron, sc = scene(), t = performance.now() / 300;
+  const wave = k => Math.sin(t + k) * 2;
+  if (sc === 'hall') {
+    poly(c, [[x - 52, y - 86 + wave(0)], [x + 52, y - 86 + wave(1)], [x + 47, y - 22], [x + 30, y - 3], [x - 30, y - 3], [x - 47, y - 22]], 'rgba(140,255,79,.55)', null, 0);
+    ell(c, x, y - 87, 104, 16, 'rgba(140,255,79,.85)', '#3FA81E', 2);
+    rr(c, x, y - 92, 122, 12, 6, null, '#444444', 4);
+    txt(c, 'BLUBB', x, y - 45, 12, '#1A3A0A');
+  } else if (sc === 'forest') {
+    poly(c, [[x - 50, y - 86 + wave(0)], [x + 50, y - 86 + wave(1)], [x + 55, y - 3], [x - 55, y - 3]], 'rgba(198,255,122,.5)', null, 0);
+    ell(c, x, y - 90, 104, 22, null, '#2B1A10', 3); ell(c, x, y - 88, 80, 12, 'rgba(198,255,122,.85)');
+  } else if (sc === 'class') {
+    poly(c, [[x - 48, y - 60 + wave(0)], [x + 48, y - 60 + wave(1)], [x + 48, y - 6], [x + 42, y - 2], [x - 42, y - 2], [x - 48, y - 6]], 'rgba(157,123,255,.6)', null, 0);
+    poly(c, [[x - 50, y - 96], [x + 50, y - 96], [x + 50, y - 6], [x + 42, y], [x - 42, y], [x - 50, y - 6]], 'rgba(220,240,255,.12)', '#DDE8F0', 3);
+  } else {
+    poly(c, [[x - 52, y - 68 + wave(0)], [x + 52, y - 68 + wave(1)], [x + 52, y - 3], [x - 52, y - 3]], 'rgba(159,216,255,.5)', null, 0);
+    ell(c, x, y - 70, 110, 20, null, '#2E2A3A', 3);
+  }
+}
 function drawFixtures(c) {
   const sc = scene();
   const wx = webBody.position.x, wy = webBody.position.y, wob = Math.sin(webWobble * 30) * webWobble * 40;
@@ -761,9 +807,7 @@ Events.on(engine, 'collisionStart', e => {
         Body.setVelocity(other, { x: other.velocity.x, y: -rnd(13, 16) });
         webWobble = 0.5; Sfx.play('boing', 1, 0.12); buzz(15);
       } else if (kind === 'cauldron') {
-        Body.setVelocity(other, { x: rnd(-4, 4), y: -rnd(18, 21) });
-        Body.setAngularVelocity(other, rnd(-0.3, 0.3));
-        sparkle(cauldron.x, cauldron.y - 100, '#8CFF4F', 'BLUBB!'); Sfx.play('blubb', 1, 0.25); buzz(30);
+        dunk(other);
       }
     }
     if (a.isSensor || b.isSensor) continue;
@@ -776,7 +820,42 @@ Events.on(engine, 'collisionStart', e => {
     }
   }
 });
+// ---------------------------------------------------------------- Eintauchen in Topf/Stumpf/Becher/Brunnen
+const dunks = new Map();   // body.id → { b, t }
+const SPLASH = { hall: '#8CFF4F', forest: '#C6FF7A', class: '#D9A6FF', grave: '#9FD8FF' };
+function dunk(b) {
+  const now = performance.now();
+  if (dunks.has(b.id) || (b.plugin.dunkCool && now < b.plugin.dunkCool)) return;
+  dunks.set(b.id, { b, t: now });
+  Body.setVelocity(b, { x: b.velocity.x * 0.3, y: Math.min(b.velocity.y, 4) * 0.4 });
+  for (let i = 0; i < 8; i++) particles.push({ x: b.position.x + rnd(-10, 10), y: cauldron.y - 88, vx: rnd(-2, 2), vy: -rnd(1.5, 3.5), life: 1, r: 4, color: SPLASH[scene()] });
+  Sfx.play('blubb', 0.6, 0.15); buzz(15);
+}
+function launchFromPot(b) {
+  const g = b.collisionFilter.group;
+  const team = g < 0 ? Composite.allBodies(world).filter(x => x.collisionFilter.group === g) : [b];
+  const vx = rnd(-4, 4), vy = -rnd(18, 21), now = performance.now();
+  for (const x of team) {
+    dunks.delete(x.id); x.plugin.dunkCool = now + 800;
+    Body.setVelocity(x, { x: vx, y: vy }); Body.setAngularVelocity(x, rnd(-0.3, 0.3));
+  }
+  sparkle(cauldron.x, cauldron.y - 100, SPLASH[scene()], 'BLUBB!'); Sfx.play('blubb', 1, 0.25); buzz(30);
+}
+function updateDunks() {
+  const now = performance.now(), gy = engine.gravity.y * engine.gravity.scale;
+  for (const { b, t } of [...dunks.values()]) {
+    if (!dunks.has(b.id)) continue;
+    const far = Math.abs(b.position.x - cauldron.x) > 70 || b.position.y < cauldron.y - 130;
+    if (far || isDragged(b) || !Composite.get(world, b.id, 'body')) { dunks.delete(b.id); continue; }   // herausgezogen
+    // zähe Flüssigkeit: bremst stark, Auftrieb lässt langsam sinken, leichtes Schaukeln
+    Body.setVelocity(b, { x: b.velocity.x * 0.86 + (cauldron.x - b.position.x) * 0.004, y: b.velocity.y * 0.86 });
+    Body.applyForce(b, b.position, { x: 0, y: -gy * b.mass * 0.8 });
+    if (Math.random() < 0.06) particles.push({ x: b.position.x + rnd(-12, 12), y: cauldron.y - 86, vx: 0, vy: -rnd(0.5, 1.2), life: 1, r: 4, color: SPLASH[scene()] });
+    if (now - t > 1300) launchFromPot(b);
+  }
+}
 Events.on(engine, 'beforeUpdate', () => {
+  updateDunks();
   const gy = engine.gravity.y * engine.gravity.scale;
   for (const b of Composite.allBodies(world)) {
     if (!b.plugin || !b.plugin.floaty) continue;
@@ -875,6 +954,7 @@ function frame(now) {
     o.fn(ctx, o.b.plugin.style);
     ctx.restore();
   }
+  drawFixturesFront(ctx);
   for (let k = particles.length - 1; k >= 0; k--) {
     const p = particles[k]; p.x += p.vx; p.y += p.vy; p.life -= 0.025;
     if (p.life <= 0) { particles.splice(k, 1); continue; }

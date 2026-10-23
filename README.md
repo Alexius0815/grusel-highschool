@@ -6,7 +6,9 @@ im Hexenkessel hochschleudern – und eigene Monster gestalten. Läuft im Browse
 ## Funktionen
 - Physik mit [Matter.js](https://brm.io/matter-js/) – Ziehen und Werfen, auch mit mehreren Fingern gleichzeitig
 - 4 Orte mit eigener Kulisse, eigenen Spielgeräten und eigener Musik: Schulflur, Gruselwald, Klassenzimmer, Friedhof
-- 6 Start-Figuren + **Erstellungsmodus**: Name, Monsterart, Haut-, Haar- und Augenfarbe, Frisur, Kleidung, Schuhe, Accessoires
+- 12 Start-Figuren in 10 Monsterarten (u. a. Vampir, Werwolf, Katze, Teufelchen, Fledermaus, Alien)
+- In Kessel, Baumstumpf, Becherglas und Brunnen kann man eintauchen – danach wird man herausgeschleudert
+- **Erstellungsmodus**: Name, Monsterart, Haut-, Haar- und Augenfarbe, Frisur, Kleidung, Schuhe, Accessoires
 - Löschen mit Rückfrage und Wiederherstellen
 - Schwerkraft-Modi (normal, Mond, schwerelos, verkehrt herum)
 - Sounds und Musik werden komplett im Browser synthetisiert (keine Audiodateien)
