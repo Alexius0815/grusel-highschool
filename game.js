@@ -2,7 +2,7 @@
 (() => {
 'use strict';
 const { Engine, Bodies, Body, Composite, Constraint, Events, Query } = Matter;
-const VERSION = 8;
+const VERSION = 9;
 const $ = id => document.getElementById(id);
 const PI = Math.PI, rnd = (a, b) => a + Math.random() * (b - a), pick = a => a[Math.floor(Math.random() * a.length)];
 
@@ -55,6 +55,23 @@ const T = {
   'kind.devil': { de: 'Teufelchen', en: 'Little devil', hu: 'Ördögfióka' },
   'kind.bat': { de: 'Fledermaus', en: 'Bat', hu: 'Denevér' },
   'kind.alien': { de: 'Alien', en: 'Alien', hu: 'Földönkívüli' },
+  'kind.gorgon': { de: 'Gorgone', en: 'Gorgon', hu: 'Gorgó' },
+  'hair.medusa': { de: 'Schlangenhaar', en: 'Snake hair', hu: 'Kígyóhaj' },
+  'hair.bald': { de: 'Glatze', en: 'Bald', hu: 'Kopasz' },
+  'top.hoodie': { de: 'Hoodie', en: 'Hoodie', hu: 'Kapucnis pulóver' },
+  'top.suit': { de: 'Anzug', en: 'Suit', hu: 'Öltöny' },
+  'bottom.shorts': { de: 'Shorts', en: 'Shorts', hu: 'Rövidnadrág' },
+  'acc.cap': { de: 'Kappe', en: 'Cap', hu: 'Baseballsapka' },
+  'acc.bowtie': { de: 'Fliege', en: 'Bow tie', hu: 'Csokornyakkendő' },
+  'cr.face': { de: 'Gesicht', en: 'Face', hu: 'Arc' },
+  'face.lashes': { de: 'Wimpern', en: 'Lashes', hu: 'Szempilla' },
+  'face.plain': { de: 'Schlicht', en: 'Plain', hu: 'Egyszerű' },
+  'face.beard': { de: 'Bart', en: 'Beard', hu: 'Szakáll' },
+  'face.mustache': { de: 'Schnurrbart', en: 'Moustache', hu: 'Bajusz' },
+  'prop.tramp': { de: 'Trampolin', en: 'Trampoline', hu: 'Trambulin' },
+  'prop.pot': { de: 'Kessel', en: 'Cauldron', hu: 'Üst' },
+  'tipped': { de: 'Ausgekippt! 💦', en: 'Tipped over! 💦', hu: 'Kiborult! 💦' },
+  'upright': { de: 'Wieder aufgestellt!', en: 'Back on its feet!', hu: 'Újra áll!' },
   'cr.skin': { de: 'Hautfarbe', en: 'Skin', hu: 'Bőrszín' },
   'cr.hair': { de: 'Haarfarbe', en: 'Hair colour', hu: 'Hajszín' },
   'cr.streak': { de: 'Strähne', en: 'Streak', hu: 'Tincs' },
@@ -108,15 +125,16 @@ if (!T.title[lang]) lang = 'en';
 const tr = (k, arg) => { const e = T[k]; let s = e ? (e[lang] || e.en) : k; return arg != null ? s.replace('%@', arg) : s; };
 
 // ---------------------------------------------------------------- Ghoul-Modell
-const KINDS = ['vampire', 'wolf', 'stitch', 'sea', 'ghost', 'mummy', 'cat', 'devil', 'bat', 'alien'];
-const HAIRS = ['long', 'short', 'pigtails'], TOPS = ['dress', 'shirt', 'jacket'], BOTTOMS = ['skirt', 'pants', 'tutu'];
-const SHOES = ['platform', 'boots', 'sneakers'], ACCS = ['none', 'bow', 'crown', 'hat', 'glasses'];
-const EMOJI = { vampire: '🧛‍♀️', wolf: '🐺', stitch: '🧟‍♀️', sea: '🧜‍♀️', ghost: '👻', mummy: '🏺', cat: '🐱', devil: '😈', bat: '🦇', alien: '👽' };
+const KINDS = ['vampire', 'wolf', 'stitch', 'sea', 'ghost', 'mummy', 'cat', 'devil', 'bat', 'alien', 'gorgon'];
+const HAIRS = ['long', 'short', 'pigtails', 'medusa', 'bald'], TOPS = ['dress', 'shirt', 'jacket', 'hoodie', 'suit'], BOTTOMS = ['skirt', 'pants', 'tutu', 'shorts'];
+const FACES = ['lashes', 'plain', 'beard', 'mustache'];
+const SHOES = ['platform', 'boots', 'sneakers'], ACCS = ['none', 'bow', 'crown', 'hat', 'glasses', 'cap', 'bowtie'];
+const EMOJI = { vampire: '🧛‍♀️', wolf: '🐺', stitch: '🧟‍♀️', sea: '🧜‍♀️', ghost: '👻', mummy: '🏺', cat: '🐱', devil: '😈', bat: '🦇', alien: '👽', gorgon: '🐍' };
 const SKIN = ['#FFE3EC', '#E6DDF7', '#BFE9FF', '#F6E4F0', '#F4F6FF', '#E9D9B0', '#FFD7B5', '#C9956B', '#8D5A3B', '#9FE3C8', '#7FD6E8', '#B9A6FF', '#FFB3D9', '#A8E06C', '#9E9E9E'];
 const COLORS = ['#111111', '#FFFFFF', '#FF4FA3', '#E0207F', '#7B2CBF', '#9D7BFF', '#3B6FD8', '#38D1C1', '#2EC4B6', '#8CFF4F', '#FFE066', '#FF8A1F', '#FF3B3B', '#5A3420', '#D4AF37', '#1E8C8C', '#FFB3D9', '#3B2A4F'];
 const LIPS = ['#C2185B', '#FF4FA3', '#7B2CBF', '#1565C0', '#8E3B2F', '#111111', '#2E7D6B', '#FF3B3B'];
-const G = (id, name, kind, skin, hair, streak, eyes, lips, top, bottom, accent, hairStyle, topStyle, bottomStyle, shoes, accessory) =>
-  ({ id, name, kind, skin, hair, streak, eyes, lips, top, bottom, accent, hairStyle, topStyle, bottomStyle, shoes, accessory });
+const G = (id, name, kind, skin, hair, streak, eyes, lips, top, bottom, accent, hairStyle, topStyle, bottomStyle, shoes, accessory, face = 'lashes') =>
+  ({ id, name, kind, skin, hair, streak, eyes, lips, top, bottom, accent, hairStyle, topStyle, bottomStyle, shoes, accessory, face });
 const BUILTIN = [
   // Eigene Figuren – Farben & Merkmale bewusst unabhängig von bekannten Spielzeug-Reihen gewählt
   G('b1', 'Vela', 'vampire', '#DDE3F0', '#7A1030', '#D4AF37', '#38D1C1', '#7A1030', '#1E8C8C', '#111111', '#D4AF37', 'short', 'jacket', 'pants', 'sneakers', 'glasses'),
@@ -131,13 +149,19 @@ const BUILTIN = [
   G('b10', 'Zip', 'alien', '#A8E06C', '#38D1C1', '#FFFFFF', '#1E8C8C', '#2E7D6B', '#FFFFFF', '#3B6FD8', '#38D1C1', 'pigtails', 'shirt', 'tutu', 'platform', 'none'),
   G('b11', 'Perla', 'sea', '#BFE9FF', '#FF4FA3', '#FFE066', '#2E86FF', '#C2185B', '#38D1C1', '#9D7BFF', '#FFFFFF', 'long', 'dress', 'skirt', 'sneakers', 'crown'),
   G('b12', 'Wölkchen', 'ghost', '#FFFFFF', '#FFB3D9', '#9D7BFF', '#3B6FD8', '#FF4FA3', '#BFE9FF', '#FFB3D9', '#FF4FA3', 'pigtails', 'dress', 'tutu', 'platform', 'bow'),
+  G('b13', 'Bruno', 'wolf', '#E8C9A8', '#5A3420', '#C9956B', '#FFB300', '#8E3B2F', '#3B6FD8', '#111111', '#FF8A1F', 'short', 'hoodie', 'shorts', 'sneakers', 'cap', 'plain'),
+  G('b14', 'Graf Kalle', 'vampire', '#E6DDF7', '#111111', '#FFFFFF', '#E0207F', '#7A1030', '#111111', '#111111', '#E0207F', 'bald', 'suit', 'pants', 'boots', 'bowtie', 'mustache'),
+  G('b15', 'Zischi', 'gorgon', '#A8E06C', '#2E7D6B', '#FFE066', '#FFE066', '#7B2CBF', '#7B2CBF', '#2EC4B6', '#FFE066', 'medusa', 'dress', 'skirt', 'sneakers', 'none', 'lashes'),
+  G('b16', 'Theo', 'devil', '#FFD7B5', '#FF8A1F', '#FFE066', '#3B6FD8', '#C2185B', '#FF3B3B', '#3B6FD8', '#FFE066', 'short', 'hoodie', 'pants', 'sneakers', 'none', 'plain'),
+  G('b17', 'Opa Mumm', 'mummy', '#E9D9B0', '#FFFFFF', '#DDDDDD', '#1E5AA8', '#8E3B2F', '#5A3420', '#5A3420', '#D4AF37', 'bald', 'suit', 'pants', 'boots', 'glasses', 'beard'),
 ];
-let custom = load('customGhouls') || [];
+let custom = (load('customGhouls') || []).map(g => Object.assign({ face: 'lashes' }, g));
 let deleted = [];
 const allGhouls = () => BUILTIN.concat(custom);
 const uid = () => 'g' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
 const randomGhoul = (name, id) => G(id || uid(), name, pick(KINDS), pick(SKIN), pick(COLORS), pick(COLORS), pick(COLORS), pick(LIPS),
-  pick(COLORS), pick(COLORS), pick(COLORS), pick(HAIRS), pick(TOPS), pick(BOTTOMS), pick(SHOES), pick(ACCS));
+  pick(COLORS), pick(COLORS), pick(COLORS), pick(HAIRS), pick(TOPS), pick(BOTTOMS), pick(SHOES), pick(ACCS),
+  pick(['lashes', 'lashes', 'plain', 'plain', 'beard', 'mustache']));
 const saveCustom = () => save('customGhouls', custom);
 
 // ---------------------------------------------------------------- Zeichen-Helfer (lokale Koordinaten, y nach unten)
@@ -163,13 +187,28 @@ function drawTorso(c, s) {
   rr(c, 0, 0, 34, 50, 10, s.top, INK, 2.5);
   if (s.topStyle === 'dress') rr(c, 0, 8, 34, 5, 2, s.accent, INK, 1);
   if (s.topStyle === 'shirt') segs(c, [[-16, -8, 16, -8], [-16, 0, 16, 0]], s.accent, 3);
+  if (s.topStyle === 'hoodie') {
+    rr(c, 0, -23, 30, 9, 4, alpha(s.top, 1), INK, 1.5);
+    segs(c, [[-4, -20, -4, -9], [4, -20, 4, -9]], '#FFFFFF', 1.5);
+    rr(c, 0, 10, 22, 9, 3, null, INK, 1.2);
+  }
+  if (s.topStyle === 'suit') {
+    poly(c, [[-8, -25], [8, -25], [0, -6]], '#FFFFFF', null, 0);
+    poly(c, [[0, -22], [-3, -17], [0, 2], [3, -17]], s.accent, INK, 1);
+    segs(c, [[-8, -25, -2, -4], [8, -25, 2, -4]], INK, 1.5);
+    ell(c, 0, 8, 3, 3, INK); ell(c, 0, 15, 3, 3, INK);
+  }
+  if (s.accessory === 'bowtie') {
+    poly(c, [[0, -21], [-9, -26], [-9, -16]], s.accent, INK, 1.2); poly(c, [[0, -21], [9, -26], [9, -16]], s.accent, INK, 1.2);
+    ell(c, 0, -21, 4, 4, s.accent, INK, 1);
+  }
   if (s.topStyle === 'jacket') {
     rr(c, 0, 0, 14, 46, 3, '#FFFFFF', null, 0);
     poly(c, [[-7, -23], [0, -10], [-12, -23]], s.accent, INK, 1);
     poly(c, [[7, -23], [0, -10], [12, -23]], s.accent, INK, 1);
     segs(c, [[-7, -22, -7, 24], [7, -22, 7, 24]], INK, 1.5);
   }
-  const sym = { vampire: '♥', wolf: '☾', sea: '✦', ghost: '☁', cat: '✿', devil: '♥', bat: '☾', alien: '★' }[s.kind] || '☠';
+  const sym = s.topStyle === 'suit' ? '' : { vampire: '♥', wolf: '☾', sea: '✦', ghost: '☁', cat: '✿', devil: '♥', bat: '☾', alien: '★', gorgon: '❦' }[s.kind] || '☠';
   txt(c, sym, 0, -5, 13, s.topStyle === 'jacket' ? INK : s.accent);
   if (s.bottomStyle === 'skirt') {
     poly(c, [[-17, 16], [17, 16], [27, 33], [-27, 33]], s.bottom, INK, 2.5);
@@ -179,7 +218,7 @@ function drawTorso(c, s) {
     for (let i = 0; i <= 8; i++) pts.push([32 - i * 8, i % 2 === 0 ? 32 : 26]);
     poly(c, pts, alpha(s.bottom, 0.85), INK, 2);
     poly(c, pts.map(p => [p[0] * 0.8, p[1] - 4]), alpha(s.accent, 0.5), null, 0);
-  } else rr(c, 0, 20, 34, 12, 3, s.bottom, INK, 2);
+  } else rr(c, 0, 20, 34, 12, 3, s.bottom, INK, 2);   // Hose & Shorts
   if (s.kind === 'mummy') segs(c, [[-17, -18, 17, -10], [-17, -2, 17, 4]], s.skin, 4);
   if (s.kind === 'cat') {
     for (const sd of [-1, 1]) { poly(c, [[10 * sd, -21], [25 * sd, -18], [21 * sd, -40]], s.hair, INK, 2); poly(c, [[14 * sd, -22], [22 * sd, -21], [20 * sd, -33]], '#FFB3D9', null, 0); }
@@ -191,7 +230,7 @@ function drawTorso(c, s) {
 }
 function drawArm(c, s) {
   rr(c, 0, 0, 11, 40, 5, s.skin);
-  const len = s.topStyle === 'jacket' ? 30 : 14;
+  const len = ['jacket', 'hoodie', 'suit'].includes(s.topStyle) ? 30 : 14;
   rr(c, 0, -(20 - len / 2), 13, len, 4, s.top, INK, 1.5);
   ell(c, 0, 10, 10, 4, s.accent);
   if (s.kind === 'wolf') segs(c, [[-4, 20, -5, 24], [0, 20, 0, 25], [4, 20, 5, 24]], '#FFFFFF', 2);
@@ -200,6 +239,7 @@ function drawArm(c, s) {
 function drawLeg(c, s) {
   rr(c, 0, 0, 13, 46, 5, s.skin);
   if (s.bottomStyle === 'pants') rr(c, 0, -7, 15, 32, 4, s.bottom, INK, 1.5);
+  if (s.bottomStyle === 'shorts') rr(c, 0, -15, 15, 16, 4, s.bottom, INK, 1.5);
   if (s.kind !== 'ghost') {
     if (s.shoes === 'platform') { rr(c, 0, 14, 17, 20, 4, s.accent, INK, 2); rr(c, 0, 24, 19, 6, 2, INK, INK, 1); }
     else if (s.shoes === 'boots') { rr(c, 0, 10, 17, 28, 4, INK, s.accent, 2); segs(c, [[-6, 0, 6, 0]], s.accent, 2); }
@@ -211,6 +251,19 @@ function drawLeg(c, s) {
 function drawHeadBack(c, s) {
   if (s.hairStyle === 'long') { rr(c, 0, 10, 66, 74, 26, s.hair, INK, 2); rr(c, 22, 4, 10, 60, 5, s.streak, null, 0); }
   else if (s.hairStyle === 'short') ell(c, 0, -6, 62, 52, s.hair, INK, 2);
+  else if (s.hairStyle === 'bald') { /* keine Haare */ }
+  else if (s.hairStyle === 'medusa') {
+    // Schlangenhaar: kleine, freundliche Schlangen, die sanft wackeln
+    const t = performance.now() / 380;
+    for (let i = 0; i < 7; i++) {
+      const a = -2.75 + i * 0.4, w = Math.sin(t + i * 1.3) * 6;
+      const bx = Math.cos(a) * 20, by = Math.sin(a) * 20, tx = Math.cos(a) * 42 + w, ty = Math.sin(a) * 42;
+      const mx = Math.cos(a + 0.35) * 32, my = Math.sin(a + 0.35) * 32;
+      for (const [col, lw] of [[INK, 9], [s.hair, 6]]) { c.beginPath(); c.moveTo(bx, by); c.quadraticCurveTo(mx, my, tx, ty); c.strokeStyle = col; c.lineWidth = lw; c.lineCap = 'round'; c.stroke(); }
+      ell(c, tx, ty, 12, 10, s.hair, INK, 1.5); ell(c, tx - 2.5, ty - 1.5, 2.4, 2.4, INK); ell(c, tx + 2.5, ty - 1.5, 2.4, 2.4, INK);
+      ell(c, tx, ty + 2, 4, 2, s.streak);
+    }
+  }
   else for (const sd of [-1, 1]) {
     c.save(); c.translate(36 * sd, 2); c.rotate(-0.35 * sd);
     ell(c, 0, 0, 26, 40, s.hair, INK, 2); ell(c, 0, -17, 10, 7, s.accent, INK, 1);
@@ -221,16 +274,19 @@ function drawHeadBack(c, s) {
 }
 function drawHeadFront(c, s) {
   c.beginPath(); c.arc(0, 0, 26, 0, 2 * PI); paint(c, s.skin, INK, 2.5);
-  ell(c, 0, -17, 58, 26, s.hair, INK, 2);
-  ell(c, -12, -18, 13, 22, s.streak);
+  if (s.hairStyle === 'bald') ell(c, -8, -15, 12, 6, 'rgba(255,255,255,.55)', null, 0, -0.4);
+  else if (s.hairStyle === 'medusa') { ell(c, 0, -21, 44, 14, s.hair, INK, 2); ell(c, -10, -22, 8, 6, s.streak); ell(c, 10, -22, 8, 6, s.streak); }
+  else { ell(c, 0, -17, 58, 26, s.hair, INK, 2); ell(c, -12, -18, 13, 22, s.streak); }
   for (const x of [-10, 10]) {
     ell(c, x, 0, 15, 18, '#FFFFFF', INK, 1.5);
     ell(c, x, 1.5, 11, 12, s.eyes); ell(c, x, 2, 5, 5.5, INK);
     ell(c, x + 2, -1.5, 3.6, 3.6, '#FFFFFF'); ell(c, x - 2.2, 4, 1.8, 1.8, '#FFFFFF');
     const d = x < 0 ? -1 : 1;
-    segs(c, [[x + 5 * d, -6, x + 9 * d, -9], [x + 2 * d, -8, x + 4 * d, -12]], INK, 1.8);
+    if ((s.face || 'lashes') === 'lashes') segs(c, [[x + 5 * d, -6, x + 9 * d, -9], [x + 2 * d, -8, x + 4 * d, -12]], INK, 1.8);
   }
   for (const x of [-17, 17]) ell(c, x, 9, 10, 5.5, 'rgba(255,110,160,.45)');
+  if (s.face === 'beard') { ell(c, 0, 17, 36, 22, s.hair, INK, 1.5); ell(c, 0, 13, 14, 7, alpha(s.skin.length === 7 ? s.skin : '#FFFFFF', 1)); }
+  if (s.face === 'mustache') { ell(c, -6, 8, 13, 6, s.hair, INK, 1, 0.2); ell(c, 6, 8, 13, 6, s.hair, INK, 1, -0.2); }
   c.beginPath(); c.arc(0, 11.5, 5, 0.1 * PI, 0.9 * PI); c.strokeStyle = s.lips; c.lineWidth = 2.6; c.lineCap = 'round'; c.stroke();
   ell(c, 0, 15, 3.5, 2, 'rgba(255,110,160,.8)');
   if (s.kind === 'vampire') for (const x of [-3, 3]) poly(c, [[x - 1.8, 14], [x + 1.8, 14], [x, 19]], '#FFFFFF', INK, 0.8);
@@ -247,7 +303,7 @@ function drawHeadFront(c, s) {
   if (s.kind === 'stitch') segs(c, [[13, 2, 19, 14], [13, 9, 18, 7], [15, 13, 20, 11], [-22, -6, -14, -14], [-21, -12, -17, -8]], INK, 1.5);
   if (s.kind === 'ghost') txt(c, '✦', -22, 14, 10, '#FFFFFF', '10px system-ui');
   if (s.kind === 'mummy') segs(c, [[-25, -4, 25, -10], [-25, 6, -8, 4]], '#FFFFFF', 3);
-  if (s.accessory === 'bow') {
+  if (s.accessory === 'bow' && s.hairStyle !== 'bald') {
     c.save(); c.translate(17, -26);
     poly(c, [[0, 0], [-12, -8], [-12, 8]], s.accent, INK, 1.5); poly(c, [[0, 0], [12, -8], [12, 8]], s.accent, INK, 1.5);
     ell(c, 0, 0, 6, 6, s.accent, INK, 1.5); c.restore();
@@ -258,6 +314,9 @@ function drawHeadFront(c, s) {
     ell(c, 0, -24, 80, 12, INK, s.accent, 1.5);
     poly(c, [[-22, -25], [22, -25], [10, -58], [24, -72]], INK, s.accent, 1.5);
     segs(c, [[-19, -31, 19, -31]], s.accent, 4);
+  } else if (s.accessory === 'cap') {
+    c.beginPath(); c.ellipse(0, -17, 29, 17, 0, PI, 2 * PI); c.closePath(); paint(c, s.accent, INK, 2);
+    ell(c, 17, -18, 32, 7, s.accent, INK, 1.5); ell(c, 0, -32, 5, 4, INK);
   } else if (s.accessory === 'glasses') {
     for (const x of [-10, 10]) { c.beginPath(); c.arc(x, 0, 10, 0, 2 * PI); c.strokeStyle = s.accent === '#FFFFFF' ? INK : s.accent; c.lineWidth = 2.5; c.stroke(); }
     segs(c, [[-1, -1, 1, -1]], INK, 2);
@@ -435,7 +494,7 @@ let W = 800, H = 600, dpr = 1;
 // Welt-Maßstab: Auf kleinen Geräten wird die ganze Spielwelt (Figuren, Gegenstände, Kulisse)
 // verkleinert, damit die Figuren genug Platz zum Toben haben. Die Physik rechnet in Welt-Einheiten.
 let S = 1;
-let statics = [], webBody = null, cauldron = null, webWobble = 0;
+let statics = [];
 const particles = [], texts = [];
 const bgCanvas = document.createElement('canvas');
 
@@ -448,14 +507,6 @@ function buildStatics() {
     Bodies.rectangle(W + 100, H / 2, 200, H * 4, o),
     Bodies.rectangle(W / 2, -100, W * 3, 200, o),
   ];
-  const wx = W * 0.16, wy = H - FLOOR - 60;
-  webBody = Bodies.rectangle(wx, wy, 160, 8, { isStatic: true, friction: 0.2, plugin: { kind: 'web' } });
-  const cx = W * 0.84, cy = H - FLOOR;
-  cauldron = { x: cx, y: cy };
-  const wallL = Bodies.rectangle(cx - 52, cy - 55, 10, 92, { isStatic: true, angle: 0.12, plugin: { kind: 'wall' } });
-  const wallR = Bodies.rectangle(cx + 52, cy - 55, 10, 92, { isStatic: true, angle: -0.12, plugin: { kind: 'wall' } });
-  const sensor = Bodies.rectangle(cx, cy - 50, 86, 70, { isStatic: true, isSensor: true, plugin: { kind: 'cauldron' } });
-  statics.push(webBody, wallL, wallR, sensor);
   Composite.add(world, statics);
 }
 
@@ -606,79 +657,151 @@ function buildBackground() {
   SCENE_DRAW[scene()](c);
 }
 
-// Spielgeräte: gleiche Physik, Aussehen je nach Szene
+// ---------------------------------------------------------------- Bewegliche Spielgeräte: Trampolin & Kessel
 const FX = {
-  hall: { bubble: '#8CFF4F' }, forest: { bubble: '#C6FF7A' }, class: { bubble: '#D9A6FF' }, grave: { bubble: '#9FD8FF' },
+  hall: { bubble: '#8CFF4F', liquid: 'rgba(140,255,79,.6)', top: -86, w: 50 },
+  forest: { bubble: '#C6FF7A', liquid: 'rgba(198,255,122,.55)', top: -86, w: 50 },
+  class: { bubble: '#D9A6FF', liquid: 'rgba(157,123,255,.65)', top: -62, w: 47 },
+  grave: { bubble: '#9FD8FF', liquid: 'rgba(159,216,255,.55)', top: -68, w: 51 },
 };
-// Vordere Ebene: Flüssigkeit über allem, was gerade eintaucht
-function drawFixturesFront(c) {
-  const { x, y } = cauldron, sc = scene(), t = performance.now() / 300;
-  const wave = k => Math.sin(t + k) * 2;
-  if (sc === 'hall') {
-    poly(c, [[x - 52, y - 86 + wave(0)], [x + 52, y - 86 + wave(1)], [x + 47, y - 22], [x + 30, y - 3], [x - 30, y - 3], [x - 47, y - 22]], 'rgba(140,255,79,.55)', null, 0);
-    ell(c, x, y - 87, 104, 16, 'rgba(140,255,79,.85)', '#3FA81E', 2);
-    rr(c, x, y - 92, 122, 12, 6, null, '#444444', 4);
-    txt(c, 'BLUBB', x, y - 45, 12, '#1A3A0A');
-  } else if (sc === 'forest') {
-    poly(c, [[x - 50, y - 86 + wave(0)], [x + 50, y - 86 + wave(1)], [x + 55, y - 3], [x - 55, y - 3]], 'rgba(198,255,122,.5)', null, 0);
-    ell(c, x, y - 90, 104, 22, null, '#2B1A10', 3); ell(c, x, y - 88, 80, 12, 'rgba(198,255,122,.85)');
-  } else if (sc === 'class') {
-    poly(c, [[x - 48, y - 60 + wave(0)], [x + 48, y - 60 + wave(1)], [x + 48, y - 6], [x + 42, y - 2], [x - 42, y - 2], [x - 48, y - 6]], 'rgba(157,123,255,.6)', null, 0);
-    poly(c, [[x - 50, y - 96], [x + 50, y - 96], [x + 50, y - 6], [x + 42, y], [x - 42, y], [x - 50, y - 6]], 'rgba(220,240,255,.12)', '#DDE8F0', 3);
-  } else {
-    poly(c, [[x - 52, y - 68 + wave(0)], [x + 52, y - 68 + wave(1)], [x + 52, y - 3], [x - 52, y - 3]], 'rgba(159,216,255,.5)', null, 0);
-    ell(c, x, y - 70, 110, 20, null, '#2E2A3A', 3);
-  }
+const devices = kind => Composite.allBodies(world).filter(b => b.plugin && b.plugin.kind === kind);
+// lokale Koordinaten: Ursprung = Mitte unten des Geräts
+function toWorld(b, lx, ly) {
+  const o = b.plugin.off, x = lx + o.x, y = ly + o.y, ca = Math.cos(b.angle), sa = Math.sin(b.angle);
+  return { x: b.position.x + x * ca - y * sa, y: b.position.y + x * sa + y * ca };
 }
-function drawFixtures(c) {
-  const sc = scene();
-  const wx = webBody.position.x, wy = webBody.position.y, wob = Math.sin(webWobble * 30) * webWobble * 40;
+function toLocal(b, wx, wy) {
+  const dx = wx - b.position.x, dy = wy - b.position.y, ca = Math.cos(-b.angle), sa = Math.sin(-b.angle);
+  return { x: dx * ca - dy * sa - b.plugin.off.x, y: dx * sa + dy * ca - b.plugin.off.y };
+}
+const upOf = b => ({ x: Math.sin(b.angle), y: -Math.cos(b.angle) });
+function compound(parts, x, y, opts) {
+  const b = Body.create(Object.assign({ parts }, opts));
+  b.plugin = Object.assign({}, opts.plugin, { off: { x: x - b.position.x, y: y - b.position.y } });
+  return b;
+}
+
+function spawnTramp(p) {
+  const { x, y } = p;
+  const top = Bodies.rectangle(x, y - 62, 160, 10, { plugin: { kind: 'trampTop' } });
+  const l = Bodies.rectangle(x - 82, y - 31, 10, 62), r = Bodies.rectangle(x + 82, y - 31, 10, 62);
+  const b = compound([top, l, r], x, y, { density: 0.003, friction: 0.9, frictionAir: 0.02,
+    plugin: { kind: 'tramp', wob: 0, wood: true, draws: [{ z: 0.25, fn: drawTramp }] } });
+  Composite.add(world, b); Sfx.play('pop', 1, 0.02);
+  return b;
+}
+function spawnPot(p) {
+  const { x, y } = p;
+  const wl = Bodies.rectangle(x - 51, y - 48, 10, 92, { angle: -0.08 });
+  const wr = Bodies.rectangle(x + 51, y - 48, 10, 92, { angle: 0.08 });
+  const bottom = Bodies.rectangle(x, y - 5, 96, 10);
+  const sensor = Bodies.rectangle(x, y - 48, 80, 66, { isSensor: true, plugin: { kind: 'potSensor' } });
+  const b = compound([wl, wr, bottom, sensor], x, y, { density: 0.004, friction: 0.8, frictionAir: 0.02,
+    plugin: { kind: 'pot', fill: 1, wood: true, spilling: false, draws: [{ z: 0.3, fn: drawPotBack }, { z: 4, fn: drawPotFront }] } });
+  Composite.add(world, b); Sfx.play('pop', 1, 0.02);
+  return b;
+}
+function spawnDefaultDevices() {
+  spawnTramp({ x: W * 0.16, y: GY() });
+  spawnPot({ x: W * 0.84, y: GY() });
+}
+
+function drawTramp(c, _s, b) {
+  c.translate(b.plugin.off.x, b.plugin.off.y);
+  const sc = scene(), wy = -62, wob = Math.sin(b.plugin.wob * 30) * b.plugin.wob * 40;
   if (sc === 'hall' || sc === 'grave') {
-    if (sc === 'hall') for (const x of [-85, 85]) rr(c, wx + x, wy + 25, 8, 70, 3, INK, '#FF4FA3', 1.5);
-    else for (const x of [-92, 92]) { pathRR(c, wx + x, wy + 20, 34, 84, 14); paint(c, '#7A7690', '#2E2A3A', 3); txt(c, '✝', wx + x, wy + 4, 14, '#2E2A3A'); }
-    const s = [[wx - 80, wy, wx + 80, wy]];
-    for (let x = -70; x <= 70; x += 20) s.push([wx + x, wy, wx + x * 0.6, wy + 14 + wob]);
-    s.push([wx - 48, wy + 14 + wob, wx + 48, wy + 14 + wob]);
+    if (sc === 'hall') for (const x of [-82, 82]) rr(c, x, -31, 8, 62, 3, INK, '#FF4FA3', 1.5);
+    else for (const x of [-84, 84]) { pathRR(c, x, -36, 30, 72, 13); paint(c, '#7A7690', '#2E2A3A', 3); txt(c, '✝', x, -48, 13, '#2E2A3A'); }
+    const s = [[-80, wy, 80, wy]];
+    for (let x = -70; x <= 70; x += 20) s.push([x, wy, x * 0.6, wy + 14 + wob]);
+    s.push([-48, wy + 14 + wob, 48, wy + 14 + wob]);
     segs(c, s, '#FFFFFF', 2);
-    txt(c, '🕷', wx + 60, wy + 26 + wob, 18, '#FFF', '18px system-ui');
+    txt(c, '🕷', 60, wy + 26 + wob, 18, '#FFF', '18px system-ui');
   } else if (sc === 'forest') {
-    // Riesenpilz: Hut federt
-    rr(c, wx, wy + 30, 38, 62, 12, '#E9D9B0', '#8A7A5A', 2);
-    c.save(); c.translate(wx, wy + 2 + wob * 0.4); c.scale(1 + webWobble * 0.3, 1 - webWobble * 0.4);
+    rr(c, 0, -30, 38, 60, 12, '#E9D9B0', '#8A7A5A', 2);
+    c.save(); c.translate(0, wy + 2 + wob * 0.4); c.scale(1 + b.plugin.wob * 0.3, 1 - b.plugin.wob * 0.4);
     c.beginPath(); c.ellipse(0, 0, 86, 34, 0, PI, 2 * PI); c.closePath(); paint(c, '#C2185B', '#5A0A2A', 3);
     for (const [dx, dy, r] of [[-45, -14, 9], [-10, -24, 11], [30, -16, 8], [58, -6, 6], [-66, -4, 6]]) ell(c, dx, dy, r * 2, r * 1.6, '#FFF3D6');
     c.restore();
   } else {
-    // Turnmatte mit Sprungfedern
-    const sp = []; for (let x = -60; x <= 60; x += 30) { for (let k = 0; k < 4; k++) sp.push([wx + x - 6, wy + 10 + k * 11 + wob * 0.2, wx + x + 6, wy + 15 + k * 11 + wob * 0.2]); }
+    const sp = []; for (let x = -60; x <= 60; x += 30) for (let k = 0; k < 5; k++) sp.push([x - 6, wy + 8 + k * 11 + wob * 0.2, x + 6, wy + 13 + k * 11 + wob * 0.2]);
     segs(c, sp, '#B0B0B8', 3);
-    rr(c, wx, wy + wob * 0.4, 170, 16, 6, '#3B6FD8', '#1A3A8A', 2.5);
-    segs(c, [[wx - 70, wy + wob * 0.4, wx + 70, wy + wob * 0.4]], 'rgba(255,255,255,.5)', 2);
+    for (const x of [-82, 82]) rr(c, x, -31, 8, 62, 3, '#8A8A96', '#4A4A56', 1.5);
+    rr(c, 0, wy + wob * 0.4, 170, 16, 6, '#3B6FD8', '#1A3A8A', 2.5);
+    segs(c, [[-70, wy + wob * 0.4, 70, wy + wob * 0.4]], 'rgba(255,255,255,.5)', 2);
   }
-  // Schleuder (Kessel / Baumstumpf / Becherglas / Brunnen)
-  const { x, y } = cauldron;
+}
+function drawPotBack(c, _s, b) {
+  c.translate(b.plugin.off.x, b.plugin.off.y);
+  const sc = scene();
   if (sc === 'hall') {
-    poly(c, [[x - 55, y - 90], [x + 55, y - 90], [x + 48, y - 20], [x + 30, y], [x - 30, y], [x - 48, y - 20]], '#1A1A1A', '#8CFF4F', 3);
-    ell(c, x, y - 88, 104, 20, '#8CFF4F', '#3FA81E', 2);
-    rr(c, x, y - 92, 122, 12, 6, null, '#444444', 4);
-    txt(c, 'BLUBB', x, y - 45, 12, '#8CFF4F');
+    poly(c, [[-55, -92], [55, -92], [48, -20], [30, 0], [-30, 0], [-48, -20]], '#1A1A1A', '#8CFF4F', 3);
   } else if (sc === 'forest') {
-    poly(c, [[x - 58, y], [x - 52, y - 90], [x + 52, y - 90], [x + 58, y]], '#5A3A22', '#2B1A10', 3);
-    segs(c, [[x - 30, y - 80, x - 34, y - 10], [x + 6, y - 84, x + 2, y - 8], [x + 34, y - 78, x + 38, y - 12]], '#3A2414', 3);
-    ell(c, x, y - 90, 104, 22, '#8A5A3A', '#2B1A10', 3); ell(c, x, y - 90, 80, 14, '#C6FF7A');
+    poly(c, [[-58, 0], [-52, -90], [52, -90], [58, 0]], '#5A3A22', '#2B1A10', 3);
+    segs(c, [[-30, -80, -34, -10], [6, -84, 2, -8], [34, -78, 38, -12]], '#3A2414', 3);
+    ell(c, 0, -90, 104, 22, '#8A5A3A', '#2B1A10', 3);
   } else if (sc === 'class') {
-    poly(c, [[x - 50, y - 96], [x + 50, y - 96], [x + 50, y - 6], [x + 42, y], [x - 42, y], [x - 50, y - 6]], 'rgba(220,240,255,.18)', '#DDE8F0', 3);
-    poly(c, [[x - 48, y - 60], [x + 48, y - 60], [x + 48, y - 6], [x + 42, y - 2], [x - 42, y - 2], [x - 48, y - 6]], 'rgba(157,123,255,.75)', null, 0);
-    for (const yy of [-80, -60, -40, -20]) segs(c, [[x + 36, y + yy, x + 48, y + yy]], '#DDE8F0', 2);
-    txt(c, '🧪', x - 30, y - 110, 22, '#fff', '22px system-ui');
+    poly(c, [[-50, -96], [50, -96], [50, -6], [42, 0], [-42, 0], [-50, -6]], 'rgba(220,240,255,.18)', '#DDE8F0', 3);
+    for (const yy of [-80, -60, -40, -20]) segs(c, [[36, yy, 48, yy]], '#DDE8F0', 2);
   } else {
-    poly(c, [[x - 56, y], [x - 56, y - 70], [x + 56, y - 70], [x + 56, y]], '#5E5A70', '#2E2A3A', 3);
-    for (let yy = -60; yy < 0; yy += 18) for (let xx = -48 + (yy % 36 ? 14 : 0); xx < 50; xx += 28) rr(c, x + xx, y + yy + 9, 24, 14, 2, null, '#2E2A3A', 1.5);
-    ell(c, x, y - 70, 110, 20, '#9FD8FF', '#2E2A3A', 3);
-    segs(c, [[x - 50, y - 70, x - 50, y - 130], [x + 50, y - 70, x + 50, y - 130], [x - 60, y - 130, x + 60, y - 130]], '#3A2A20', 6);
+    poly(c, [[-56, 0], [-56, -70], [56, -70], [56, 0]], '#5E5A70', '#2E2A3A', 3);
+    for (let yy = -60; yy < 0; yy += 18) for (let xx = -48 + (yy % 36 ? 14 : 0); xx < 50; xx += 28) rr(c, xx, yy + 9, 24, 14, 2, null, '#2E2A3A', 1.5);
+    segs(c, [[-50, -70, -50, -130], [50, -70, 50, -130], [-60, -130, 60, -130]], '#3A2A20', 6);
   }
-  if (Math.random() < 0.08) particles.push({ x: x + rnd(-40, 40), y: y - 90, vx: 0, vy: -rnd(0.5, 1.2), life: 1, r: 5, color: FX[sc].bubble });
-  // Stimmung: Glühwürmchen im Wald, Geister-Irrlichter auf dem Friedhof
+}
+function drawPotFront(c, _s, b) {
+  c.translate(b.plugin.off.x, b.plugin.off.y);
+  const sc = scene(), F = FX[sc], f = b.plugin.fill, t = performance.now() / 300;
+  if (f > 0.02) {
+    const top = -4 + (F.top + 4) * f, wave = k => Math.sin(t + k) * 2 * f;
+    poly(c, [[-F.w, top + wave(0)], [F.w, top + wave(1)], [F.w - 4, -6], [-F.w + 4, -6]], F.liquid, null, 0);
+    ell(c, 0, top, F.w * 2, 12, F.liquid.replace(/[\d.]+\)$/, '.9)'), null, 0);
+  }
+  if (sc === 'hall') { rr(c, 0, -92, 122, 12, 6, null, '#444444', 4); txt(c, 'BLUBB', 0, -45, 12, f > 0.5 ? '#1A3A0A' : '#8CFF4F'); }
+  else if (sc === 'forest') ell(c, 0, -90, 104, 22, null, '#2B1A10', 3);
+  else if (sc === 'class') { poly(c, [[-50, -96], [50, -96], [50, -6], [42, 0], [-42, 0], [-50, -6]], 'rgba(220,240,255,.1)', '#DDE8F0', 3); txt(c, '🧪', -30, -110, 22, '#fff', '22px system-ui'); }
+  else ell(c, 0, -70, 110, 20, null, '#2E2A3A', 3);
+}
+
+// Auskippen und Wieder-Auffüllen
+function updatePots() {
+  for (const pot of devices('pot')) {
+    const up = upOf(pot), p = pot.plugin;
+    if (up.y > -0.35 && p.fill > 0.02) {                       // stark gekippt → Inhalt läuft aus
+      if (!p.spilling) {
+        p.spilling = true; toast(tr('tipped')); Sfx.play('blubb', 1, 0.3); buzz(40);
+        for (const d of [...dunks.values()]) if (d.pot === pot) launchFromPot(d.b, pot, true);
+      }
+      p.fill = Math.max(0, p.fill - 0.025);
+      const m = toWorld(pot, rnd(-40, 40), FX[scene()].top);
+      for (let i = 0; i < 3; i++) particles.push({ x: m.x, y: m.y, vx: up.x * rnd(2, 5) + rnd(-1, 1), vy: up.y * rnd(2, 5), g: 0.25, life: 1.4, r: rnd(3, 6), color: FX[scene()].bubble });
+    } else if (up.y < -0.9) {                                  // aufrecht → füllt sich langsam wieder
+      p.spilling = false;
+      p.fill = Math.min(1, p.fill + 0.004);
+    }
+  }
+  for (const tr_ of devices('tramp')) tr_.plugin.wob = Math.max(0, tr_.plugin.wob - 0.02);
+}
+// Doppeltipp auf Kessel/Trampolin: umkippen bzw. wieder aufstellen
+function toggleTip(b) {
+  const up = upOf(b);
+  if (up.y < -0.7) {
+    const dir = Math.random() < 0.5 ? -1 : 1;
+    Body.setPosition(b, { x: b.position.x, y: b.position.y - 30 });
+    Body.setAngle(b, dir * 0.9); Body.setVelocity(b, { x: dir * 3, y: -2 }); Body.setAngularVelocity(b, dir * 0.12);
+  } else {
+    Body.setPosition(b, { x: b.position.x, y: b.position.y - 50 });
+    Body.setAngle(b, 0); Body.setVelocity(b, { x: 0, y: 0 }); Body.setAngularVelocity(b, 0);
+    toast(tr('upright'));
+  }
+  Sfx.play('klonk', 1, 0.1); buzz(20);
+}
+function drawAmbient() {
+  const sc = scene();
+  for (const pot of devices('pot')) if (pot.plugin.fill > 0.3 && upOf(pot).y < -0.8 && Math.random() < 0.08) {
+    const m = toWorld(pot, rnd(-40, 40), FX[sc].top * pot.plugin.fill);
+    particles.push({ x: m.x, y: m.y, vx: 0, vy: -rnd(0.5, 1.2), life: 1, r: 5, color: FX[sc].bubble });
+  }
   if (sc === 'forest' && Math.random() < 0.05) particles.push({ x: rnd(0, W), y: rnd(H * 0.3, GY() - 20), vx: rnd(-0.3, 0.3), vy: rnd(-0.3, 0.1), life: 1, r: 2.5, color: '#E8FF7A' });
   if (sc === 'grave' && Math.random() < 0.03) particles.push({ x: rnd(0, W), y: GY() - rnd(10, 60), vx: rnd(-0.4, 0.4), vy: -0.2, life: 1, r: 4, color: 'rgba(159,216,255,.8)' });
 }
@@ -711,8 +834,10 @@ function spawnGhoul(s, p = spawnPoint()) {
   Sfx.play(ghost ? 'ghost' : 'chime'); buzz(10);
 }
 
-const PROPS = [['pumpkin', '🎃'], ['coffin', '⚰️'], ['book', '📚'], ['locker', '🚪'], ['skull', '💀'], ['bat', '🦇']];
+const PROPS = [['tramp', '🤸'], ['pot', '🫕'], ['pumpkin', '🎃'], ['coffin', '⚰️'], ['book', '📚'], ['locker', '🚪'], ['skull', '💀'], ['bat', '🦇']];
 function spawnProp(kind, p = spawnPoint()) {
+  if (kind === 'tramp') return spawnTramp(p);
+  if (kind === 'pot') return spawnPot(p);
   let b, draw;
   const base = { friction: 0.6, restitution: 0.2, angle: rnd(-0.3, 0.3) };
   if (kind === 'pumpkin') {
@@ -769,7 +894,8 @@ function clearAll() {
   drags.clear();
   for (const b of Composite.allBodies(world)) if (!b.isStatic) Composite.remove(world, b);
   for (const c of Composite.allConstraints(world)) Composite.remove(world, c);
-  ghoulRecords.length = 0;
+  ghoulRecords.length = 0; dunks.clear();
+  spawnDefaultDevices();
   toast(tr('cleared'));
 }
 
@@ -800,22 +926,26 @@ let lastImpact = 0;
 Events.on(engine, 'collisionStart', e => {
   for (const pair of e.pairs) {
     const a = pair.bodyA, b = pair.bodyB;
-    for (const [fx, other] of [[a, b], [b, a]]) {
-      if (other.isStatic || isDragged(other)) continue;
+    for (const [fx, part] of [[a, b], [b, a]]) {
+      const other = part.parent, dev = fx.parent;
+      if (other.isStatic || other === dev || isDragged(other)) continue;
       const kind = fx.plugin && fx.plugin.kind;
-      if (kind === 'web') {
-        Body.setVelocity(other, { x: other.velocity.x, y: -rnd(13, 16) });
-        webWobble = 0.5; Sfx.play('boing', 1, 0.12); buzz(15);
-      } else if (kind === 'cauldron') {
-        dunk(other);
+      if (kind === 'trampTop') {
+        const up = upOf(dev), top = toWorld(dev, 0, -62);
+        if ((other.position.x - top.x) * up.x + (other.position.y - top.y) * up.y < -4) continue;   // nur von oben
+        const tx = -up.y, ty = up.x, vt = other.velocity.x * tx + other.velocity.y * ty, sp = rnd(13, 16);
+        Body.setVelocity(other, { x: tx * vt + up.x * sp, y: ty * vt + up.y * sp });
+        dev.plugin.wob = 0.5; Sfx.play('boing', 1, 0.12); buzz(15);
+      } else if (kind === 'potSensor' && other.plugin.kind !== 'pot' && other.plugin.kind !== 'tramp') {
+        dunk(other, dev);
       }
     }
     if (a.isSensor || b.isSensor) continue;
-    const dvx = a.velocity.x - b.velocity.x, dvy = a.velocity.y - b.velocity.y, sp = Math.hypot(dvx, dvy);
+    const A = a.parent, B = b.parent, dvx = A.velocity.x - B.velocity.x, dvy = A.velocity.y - B.velocity.y, sp = Math.hypot(dvx, dvy);
     const now = performance.now();
     if (sp > 5 && now - lastImpact > 70) {
       lastImpact = now;
-      const wood = (a.plugin && a.plugin.wood) || (b.plugin && b.plugin.wood);
+      const wood = (A.plugin && A.plugin.wood) || (B.plugin && B.plugin.wood);
       Sfx.play(wood ? 'klonk' : 'thud', Math.min(1, sp / 20), 0.07);
     }
   }
@@ -823,39 +953,42 @@ Events.on(engine, 'collisionStart', e => {
 // ---------------------------------------------------------------- Eintauchen in Topf/Stumpf/Becher/Brunnen
 const dunks = new Map();   // body.id → { b, t }
 const SPLASH = { hall: '#8CFF4F', forest: '#C6FF7A', class: '#D9A6FF', grave: '#9FD8FF' };
-function dunk(b) {
+function dunk(b, pot) {
   const now = performance.now();
   if (dunks.has(b.id) || (b.plugin.dunkCool && now < b.plugin.dunkCool)) return;
-  dunks.set(b.id, { b, t: now });
+  if (pot.plugin.fill < 0.4 || upOf(pot).y > -0.75) return;          // leer oder schief: kein Eintauchen
+  dunks.set(b.id, { b, t: now, pot });
   Body.setVelocity(b, { x: b.velocity.x * 0.3, y: Math.min(b.velocity.y, 4) * 0.4 });
-  for (let i = 0; i < 8; i++) particles.push({ x: b.position.x + rnd(-10, 10), y: cauldron.y - 88, vx: rnd(-2, 2), vy: -rnd(1.5, 3.5), life: 1, r: 4, color: SPLASH[scene()] });
+  const m = toWorld(pot, 0, FX[scene()].top);
+  for (let i = 0; i < 8; i++) particles.push({ x: b.position.x + rnd(-10, 10), y: m.y, vx: rnd(-2, 2), vy: -rnd(1.5, 3.5), g: 0.12, life: 1, r: 4, color: SPLASH[scene()] });
   Sfx.play('blubb', 0.6, 0.15); buzz(15);
 }
-function launchFromPot(b) {
+function launchFromPot(b, pot, soft) {
   const g = b.collisionFilter.group;
   const team = g < 0 ? Composite.allBodies(world).filter(x => x.collisionFilter.group === g) : [b];
-  const vx = rnd(-4, 4), vy = -rnd(18, 21), now = performance.now();
+  const up = upOf(pot), sp = soft ? rnd(5, 8) : rnd(18, 21), side = rnd(-4, 4), now = performance.now();
   for (const x of team) {
     dunks.delete(x.id); x.plugin.dunkCool = now + 800;
-    Body.setVelocity(x, { x: vx, y: vy }); Body.setAngularVelocity(x, rnd(-0.3, 0.3));
+    Body.setVelocity(x, { x: up.x * sp - up.y * side, y: up.y * sp + up.x * side }); Body.setAngularVelocity(x, rnd(-0.3, 0.3));
   }
-  sparkle(cauldron.x, cauldron.y - 100, SPLASH[scene()], 'BLUBB!'); Sfx.play('blubb', 1, 0.25); buzz(30);
+  if (!soft) { const m = toWorld(pot, 0, -100); sparkle(m.x, m.y, SPLASH[scene()], 'BLUBB!'); Sfx.play('blubb', 1, 0.25); buzz(30); }
 }
 function updateDunks() {
   const now = performance.now(), gy = engine.gravity.y * engine.gravity.scale;
-  for (const { b, t } of [...dunks.values()]) {
+  for (const { b, t, pot } of [...dunks.values()]) {
     if (!dunks.has(b.id)) continue;
-    const far = Math.abs(b.position.x - cauldron.x) > 70 || b.position.y < cauldron.y - 130;
-    if (far || isDragged(b) || !Composite.get(world, b.id, 'body')) { dunks.delete(b.id); continue; }   // herausgezogen
-    // zähe Flüssigkeit: bremst stark, Auftrieb lässt langsam sinken, leichtes Schaukeln
-    Body.setVelocity(b, { x: b.velocity.x * 0.86 + (cauldron.x - b.position.x) * 0.004, y: b.velocity.y * 0.86 });
+    const l = toLocal(pot, b.position.x, b.position.y);
+    const gone = !Composite.get(world, b.id, 'body') || !Composite.get(world, pot.id, 'body');
+    if (gone || Math.abs(l.x) > 70 || l.y < -135 || l.y > 25 || isDragged(b)) { dunks.delete(b.id); continue; }   // herausgezogen
+    const c = toWorld(pot, 0, -45);
+    Body.setVelocity(b, { x: b.velocity.x * 0.86 + (c.x - b.position.x) * 0.004, y: b.velocity.y * 0.86 });
     Body.applyForce(b, b.position, { x: 0, y: -gy * b.mass * 0.8 });
-    if (Math.random() < 0.06) particles.push({ x: b.position.x + rnd(-12, 12), y: cauldron.y - 86, vx: 0, vy: -rnd(0.5, 1.2), life: 1, r: 4, color: SPLASH[scene()] });
-    if (now - t > 1300) launchFromPot(b);
+    if (Math.random() < 0.06) { const m = toWorld(pot, rnd(-35, 35), FX[scene()].top); particles.push({ x: m.x, y: m.y, vx: 0, vy: -rnd(0.5, 1.2), life: 1, r: 4, color: SPLASH[scene()] }); }
+    if (now - t > 1300) launchFromPot(b, pot);
   }
 }
 Events.on(engine, 'beforeUpdate', () => {
-  updateDunks();
+  updateDunks(); updatePots();
   const gy = engine.gravity.y * engine.gravity.scale;
   for (const b of Composite.allBodies(world)) {
     if (!b.plugin || !b.plugin.floaty) continue;
@@ -892,6 +1025,7 @@ const isDragged = b => { for (const c of drags.values()) if (c.bodyB === b) retu
 function pos(e) { const r = canvas.getBoundingClientRect(); return { x: (e.clientX - r.left) / S, y: (e.clientY - r.top) / S }; }
 function rip(p) {
   const hit = pickBody(p);
+  if (hit && (hit.plugin.kind === 'pot' || hit.plugin.kind === 'tramp')) { toggleTip(hit); return true; }
   if (!hit || !hit.plugin.stitched) return false;
   for (const c of Composite.allConstraints(world)) if (c.bodyA === hit || c.bodyB === hit) Composite.remove(world, c);
   for (const [id, c] of drags) if (c.bodyB === hit) drags.delete(id);
@@ -936,10 +1070,9 @@ function frame(now) {
   let steps = 0;
   while (acc >= 16.6 && steps < 4) { Engine.update(engine, 1000 / 60); acc -= 16.6; steps++; }
   if (steps === 4) acc = 0;
-  webWobble = Math.max(0, webWobble - 0.02);
   ctx.setTransform(dpr * S, 0, 0, dpr * S, 0, 0);
   ctx.drawImage(bgCanvas, 0, 0, W, H);
-  drawFixtures(ctx);
+  drawAmbient();
   // alle Körperteile nach Ebene sortiert zeichnen
   const ops = [];
   let i = 0;
@@ -951,12 +1084,11 @@ function frame(now) {
   for (const o of ops) {
     ctx.save(); ctx.translate(o.b.position.x, o.b.position.y); ctx.rotate(o.b.angle);
     ctx.globalAlpha = o.b.plugin.alpha || 1;
-    o.fn(ctx, o.b.plugin.style);
+    o.fn(ctx, o.b.plugin.style, o.b);
     ctx.restore();
   }
-  drawFixturesFront(ctx);
   for (let k = particles.length - 1; k >= 0; k--) {
-    const p = particles[k]; p.x += p.vx; p.y += p.vy; p.life -= 0.025;
+    const p = particles[k]; p.vy += p.g || 0; p.x += p.vx; p.y += p.vy; p.life -= 0.025;
     if (p.life <= 0) { particles.splice(k, 1); continue; }
     ctx.globalAlpha = p.life; ell(ctx, p.x, p.y, p.r * 2, p.r * 2, p.color);
   }
@@ -1153,6 +1285,7 @@ function renderPanel() {
     chips(tr('cr.hairStyle'), 'hairStyle', HAIRS, k => tr('hair.' + k));
     sw(tr('cr.hair'), 'hair', COLORS); sw(tr('cr.streak'), 'streak', COLORS);
     chips(tr('cr.acc'), 'accessory', ACCS, k => tr('acc.' + k));
+    chips(tr('cr.face'), 'face', FACES, k => tr('face.' + k));
   } else {
     chips(tr('cr.top'), 'topStyle', TOPS, k => tr('top.' + k)); sw(tr('cr.topColor'), 'top', COLORS);
     chips(tr('cr.bottom'), 'bottomStyle', BOTTOMS, k => tr('bottom.' + k)); sw(tr('cr.bottomColor'), 'bottom', COLORS);
@@ -1174,6 +1307,7 @@ if (window.ResizeObserver) new ResizeObserver(() => resize()).observe($('stage')
 else window.addEventListener('resize', resize);
 window.addEventListener('resize', () => { clearTimeout(rzT); rzT = setTimeout(renderDock, 150); });
 renderAll(); resize();
+spawnDefaultDevices();
 const cast = allGhouls();
 spawnGhoul(cast[0], { x: W * 0.4, y: H * 0.35 });
 spawnGhoul(cast[1], { x: W * 0.55, y: H * 0.3 });
