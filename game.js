@@ -285,14 +285,13 @@ const Sfx = (() => {
     const notes = [880, 1046.5, 1318.5, 1760];
     bufs.chime = render(0.7, t => { let v = 0; notes.forEach((f, i) => { const st = i * 0.07; if (t >= st) v += Math.sin(2 * PI * f * (t - st)) * Math.exp(-(t - st) * 6); }); return v * 0.22; });
     o = O(); bufs.ghost = render(1.0, t => o(420 - 160 * t + 25 * Math.sin(t * 2 * PI * 6)) * Math.sin(PI * t) * 0.45);
-    bufs.music = buildMusic();
   }
-  function buildMusic() {
+  function musicSampler() {
     const step = 60 / 112 / 4, bar = step * 16;
     const chords = [[57, 60, 64], [53, 57, 60], [48, 52, 55], [52, 56, 59], [57, 60, 64], [50, 53, 57], [52, 55, 59], [52, 56, 59]];
     const pat = [0, 1, 2, 1, 0, 2, 1, 2, 0, 1, 2, 1, 2, 1, 0, 1], total = bar * chords.length;
     const hz = m => 440 * Math.pow(2, (m - 69) / 12);
-    return render(total, t => {
+    return { total, f: t => {
       const bi = Math.min(Math.floor(t / bar), 7), ch = chords[bi], tb = t - bi * bar;
       const si = Math.min(Math.floor(tb / step), 15), ts = tb - si * step, f = hz(ch[pat[si]] + 12);
       let harp = 0; for (let h = 1; h <= 4; h++) harp += Math.sin(2 * PI * f * h * ts) / (h * h);
@@ -302,7 +301,19 @@ const Sfx = (() => {
       let organ = 0; for (const n of ch) organ += Math.sin(2 * PI * hz(n) * t) + 0.4 * Math.sin(4 * PI * hz(n) * t);
       organ *= 0.05 * (0.8 + 0.2 * Math.sin(2 * PI * 5 * t));
       return (harp + bass + organ) * Math.min(1, t / 0.05, (total - t) / 0.05);
-    });
+    } };
+  }
+  // erzeugt die Musik in kleinen Stücken, damit das Spiel dabei nicht ruckelt
+  function buildMusicAsync(done) {
+    const { total, f } = musicSampler(), sr = ac.sampleRate, n = Math.floor(total * sr);
+    const b = ac.createBuffer(1, n, sr), d = b.getChannelData(0);
+    let i = 0;
+    const step = () => {
+      const end = Math.min(n, i + 20000);
+      for (; i < end; i++) { const v = f(i / sr); d[i] = v > 1 ? 1 : v < -1 ? -1 : v; }
+      if (i < n) setTimeout(step, 8); else done(b);
+    };
+    step();
   }
   function unlock() {
     if (ac) { if (ac.state === 'suspended') ac.resume(); return; }
@@ -310,9 +321,12 @@ const Sfx = (() => {
       ac = new (window.AudioContext || window.webkitAudioContext)();
       master = ac.createGain(); master.connect(ac.destination);
       build();
-      musicGain = ac.createGain(); musicGain.gain.value = musicOn ? 0.22 : 0; musicGain.connect(master);
-      const src = ac.createBufferSource(); src.buffer = bufs.music; src.loop = true; src.connect(musicGain); src.start();
       ready = true;
+      musicGain = ac.createGain(); musicGain.gain.value = musicOn ? 0.22 : 0; musicGain.connect(master);
+      // Musik erst nach dem Tipp erzeugen, damit das Greifen nicht ruckelt
+      setTimeout(() => buildMusicAsync(buf => {
+        const src = ac.createBufferSource(); src.buffer = buf; src.loop = true; src.connect(musicGain); src.start();
+      }), 600);
     } catch (e) { ac = null; }
   }
   function play(name, vol = 1, gap = 0.04) {
@@ -569,10 +583,28 @@ Events.on(engine, 'beforeUpdate', () => {
 // ---------------------------------------------------------------- Ziehen & Werfen (Multitouch)
 const drags = new Map();
 let lastTap = { t: 0, x: 0, y: 0 };
+function pickBody(p) {
+  const bodies = Composite.allBodies(world).filter(b => !b.isStatic);
+  const exact = Query.point(bodies, p);
+  if (exact.length) return exact[exact.length - 1];         // oberster Treffer
+  const r = 36 / S;                                          // Fingertoleranz in Welt-Einheiten
+  let best = null, bestD = Infinity;
+  for (const b of bodies) {
+    // Abstand zur Körperkontur (Mittelpunkt der nächsten Kante)
+    const v = b.vertices; let d = Infinity;
+    for (let i = 0; i < v.length; i++) {
+      const a = v[i], c = v[(i + 1) % v.length], dx = c.x - a.x, dy = c.y - a.y;
+      const t = Math.max(0, Math.min(1, ((p.x - a.x) * dx + (p.y - a.y) * dy) / (dx * dx + dy * dy || 1)));
+      d = Math.min(d, Math.hypot(p.x - (a.x + t * dx), p.y - (a.y + t * dy)));
+    }
+    if (d < r && d < bestD) { bestD = d; best = b; }
+  }
+  return best;
+}
 const isDragged = b => { for (const c of drags.values()) if (c.bodyB === b) return true; return false; };
 function pos(e) { const r = canvas.getBoundingClientRect(); return { x: (e.clientX - r.left) / S, y: (e.clientY - r.top) / S }; }
 function rip(p) {
-  const hit = Query.point(Composite.allBodies(world).filter(b => !b.isStatic), p)[0];
+  const hit = pickBody(p);
   if (!hit || !hit.plugin.stitched) return false;
   for (const c of Composite.allConstraints(world)) if (c.bodyA === hit || c.bodyB === hit) Composite.remove(world, c);
   for (const [id, c] of drags) if (c.bodyB === hit) drags.delete(id);
@@ -581,18 +613,22 @@ function rip(p) {
   return true;
 }
 canvas.addEventListener('pointerdown', e => {
+  e.preventDefault();
   Sfx.unlock();
   const p = pos(e), now = performance.now();
   const dbl = now - lastTap.t < 320 && Math.hypot(p.x - lastTap.x, p.y - lastTap.y) < 40 / S;
   lastTap = { t: now, x: p.x, y: p.y };
   if ((dbl || e.button === 2) && rip(p)) return;
-  const hit = Query.point(Composite.allBodies(world).filter(b => !b.isStatic), p)[0];
+  const hit = pickBody(p);
   if (!hit) return;
-  const c = Constraint.create({ pointA: { x: p.x, y: p.y }, bodyB: hit, pointB: { x: p.x - hit.position.x, y: p.y - hit.position.y }, stiffness: 0.25, damping: 0.1, length: 0 });
+  // greift am Berührungspunkt – oder (bei Toleranz-Treffer) am Rand nahe dem Finger
+  const inside = Query.point([hit], p).length > 0;
+  const gp = inside ? p : { x: hit.position.x + (p.x - hit.position.x) * 0.5, y: hit.position.y + (p.y - hit.position.y) * 0.5 };
+  const c = Constraint.create({ pointA: { x: p.x, y: p.y }, bodyB: hit, pointB: { x: gp.x - hit.position.x, y: gp.y - hit.position.y }, stiffness: 0.4, damping: 0.15, length: 0 });
   Composite.add(world, c); drags.set(e.pointerId, c);
   try { canvas.setPointerCapture(e.pointerId); } catch (_) {}
 });
-canvas.addEventListener('pointermove', e => { const c = drags.get(e.pointerId); if (c) { const p = pos(e); c.pointA.x = p.x; c.pointA.y = p.y; } });
+canvas.addEventListener('pointermove', e => { e.preventDefault(); const c = drags.get(e.pointerId); if (c) { const p = pos(e); c.pointA.x = p.x; c.pointA.y = p.y; } });
 const endDrag = e => {
   const c = drags.get(e.pointerId); if (!c) return;
   drags.delete(e.pointerId); Composite.remove(world, c);
@@ -602,6 +638,8 @@ const endDrag = e => {
 canvas.addEventListener('pointerup', endDrag);
 canvas.addEventListener('pointercancel', endDrag);
 canvas.addEventListener('contextmenu', e => e.preventDefault());
+canvas.addEventListener('touchstart', e => e.preventDefault(), { passive: false });
+canvas.addEventListener('touchmove', e => e.preventDefault(), { passive: false });
 
 // ---------------------------------------------------------------- Spielschleife
 let lastT = 0, acc = 0;
@@ -837,8 +875,11 @@ function showCoach() {
 }
 document.documentElement.lang = lang;
 let rzT = 0;
-window.addEventListener('resize', () => { resize(); clearTimeout(rzT); rzT = setTimeout(renderDock, 150); });
-resize(); renderAll();
+// Spielfeld-Größe immer am echten Element messen (Leiste, Drehen, Tastatur …)
+if (window.ResizeObserver) new ResizeObserver(() => resize()).observe($('stage'));
+else window.addEventListener('resize', resize);
+window.addEventListener('resize', () => { clearTimeout(rzT); rzT = setTimeout(renderDock, 150); });
+renderAll(); resize();
 const cast = allGhouls();
 spawnGhoul(cast[0], { x: W * 0.4, y: H * 0.35 });
 spawnGhoul(cast[1], { x: W * 0.55, y: H * 0.3 });
