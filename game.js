@@ -2,7 +2,7 @@
 (() => {
 'use strict';
 const { Engine, Bodies, Body, Composite, Constraint, Events, Query } = Matter;
-const VERSION = 6;
+const VERSION = 7;
 const $ = id => document.getElementById(id);
 const PI = Math.PI, rnd = (a, b) => a + Math.random() * (b - a), pick = a => a[Math.floor(Math.random() * a.length)];
 
@@ -30,6 +30,7 @@ const T = {
   go: { de: "Los geht's!", en: "Let's go!", hu: 'Kezdjük!' },
   'clear.q': { de: 'Alles vom Schulhof räumen?', en: 'Clear the whole schoolyard?', hu: 'Mindent letakarítasz az udvarról?' },
   lang: { de: 'Sprache', en: 'Language', hu: 'Nyelv' },
+  scenes: { de: 'Ort', en: 'Place', hu: 'Helyszín' },
   'a11y.gravity': { de: 'Schwerkraft wechseln', en: 'Change gravity', hu: 'Gravitáció váltása' },
   'a11y.music': { de: 'Musik an oder aus', en: 'Music on or off', hu: 'Zene be vagy ki' },
   settings: { de: 'Einstellungen', en: 'Settings', hu: 'Beállítások' },
@@ -287,26 +288,61 @@ const Sfx = (() => {
     bufs.chime = render(0.7, t => { let v = 0; notes.forEach((f, i) => { const st = i * 0.07; if (t >= st) v += Math.sin(2 * PI * f * (t - st)) * Math.exp(-(t - st) * 6); }); return v * 0.22; });
     o = O(); bufs.ghost = render(1.0, t => o(420 - 160 * t + 25 * Math.sin(t * 2 * PI * 6)) * Math.sin(PI * t) * 0.45);
   }
-  function musicSampler() {
-    const step = 60 / 112 / 4, bar = step * 16;
-    const chords = [[57, 60, 64], [53, 57, 60], [48, 52, 55], [52, 56, 59], [57, 60, 64], [50, 53, 57], [52, 55, 59], [52, 56, 59]];
-    const pat = [0, 1, 2, 1, 0, 2, 1, 2, 0, 1, 2, 1, 2, 1, 0, 1], total = bar * chords.length;
-    const hz = m => 440 * Math.pow(2, (m - 69) / 12);
+  // ---- Musik: ein eigenes Stück pro Szene (alles synthetisiert) ----
+  const hz = m => 440 * Math.pow(2, (m - 69) / 12);
+  const INSTR = {
+    harp: (f, ts) => { let v = 0; for (let h = 1; h <= 4; h++) v += Math.sin(2 * PI * f * h * ts) / (h * h); return v * Math.exp(-ts * 14) * 0.35; },
+    flute: (f, ts) => (Math.sin(2 * PI * f * ts + 0.25 * Math.sin(2 * PI * 5.5 * ts)) + 0.15 * Math.sin(4 * PI * f * ts)) * (1 - Math.exp(-ts * 25)) * Math.exp(-ts * 2.2) * 0.22,
+    box: (f, ts) => (Math.sin(2 * PI * f * ts) + 0.35 * Math.sin(2 * PI * f * 2 * ts) + 0.12 * Math.sin(2 * PI * f * 5.4 * ts)) * Math.exp(-ts * 7) * 0.26,
+    bell: (f, ts) => (Math.sin(2 * PI * f * ts) + 0.5 * Math.sin(2 * PI * f * 2.76 * ts) + 0.25 * Math.sin(2 * PI * f * 5.4 * ts)) * Math.exp(-ts * 3.5) * 0.2,
+  };
+  const TRACKS = {
+    // Schulflur: flottes Cembalo in a-Moll
+    hall: { bpm: 112, steps: 16, lead: 'harp', oct: 12, pad: 0.05, bass: 'quarter',
+      chords: [[57, 60, 64], [53, 57, 60], [48, 52, 55], [52, 56, 59], [57, 60, 64], [50, 53, 57], [52, 55, 59], [52, 56, 59]],
+      pat: [0, 1, 2, 1, 0, 2, 1, 2, 0, 1, 2, 1, 2, 1, 0, 1] },
+    // Gruselwald: langsame Flöte in d-Moll, Grillen
+    forest: { bpm: 80, steps: 16, lead: 'flute', oct: 12, pad: 0.045, bass: 'half', crickets: true,
+      chords: [[62, 65, 69], [58, 62, 65], [53, 57, 60], [60, 64, 67], [62, 65, 69], [55, 58, 62], [57, 61, 64], [57, 61, 64]],
+      pat: [0, -1, 2, -1, 1, -1, 2, 1, 0, -1, 2, -1, 1, 2, 1, -1] },
+    // Klassenzimmer: verspielte Spieluhr im Walzertakt
+    class: { bpm: 150, steps: 12, lead: 'box', oct: 24, pad: 0.025, bass: 'waltz',
+      chords: [[60, 64, 67], [57, 60, 64], [53, 57, 60], [55, 59, 62], [60, 64, 67], [57, 60, 64], [50, 53, 57], [55, 59, 62]],
+      pat: [0, -1, 1, 2, 1, -1, 2, -1, 1, 0, 1, 2] },
+    // Friedhof: tiefe Orgel in e-Moll, Glocke zu jedem Takt
+    grave: { bpm: 66, steps: 16, lead: 'bell', oct: 12, pad: 0.09, bass: 'whole', bellBar: true,
+      chords: [[64, 67, 71], [60, 64, 67], [57, 60, 64], [59, 63, 66], [64, 67, 71], [62, 65, 69], [60, 64, 67], [59, 63, 66]],
+      pat: [0, -1, -1, -1, 2, -1, -1, -1, 1, -1, -1, -1, 2, -1, 1, -1] },
+  };
+  function musicSampler(id) {
+    const T = TRACKS[id] || TRACKS.hall, step = 60 / T.bpm / 4, bar = step * T.steps, total = bar * T.chords.length;
+    const lead = INSTR[T.lead];
     return { total, f: t => {
-      const bi = Math.min(Math.floor(t / bar), 7), ch = chords[bi], tb = t - bi * bar;
-      const si = Math.min(Math.floor(tb / step), 15), ts = tb - si * step, f = hz(ch[pat[si]] + 12);
-      let harp = 0; for (let h = 1; h <= 4; h++) harp += Math.sin(2 * PI * f * h * ts) / (h * h);
-      harp *= Math.exp(-ts * 14) * 0.35;
-      const tq = tb % (step * 4), bf = hz(ch[0] - 24);
-      const bass = (Math.sin(2 * PI * bf * tq) + 0.3 * Math.sin(4 * PI * bf * tq)) * Math.exp(-tq * 3) * 0.45;
-      let organ = 0; for (const n of ch) organ += Math.sin(2 * PI * hz(n) * t) + 0.4 * Math.sin(4 * PI * hz(n) * t);
-      organ *= 0.05 * (0.8 + 0.2 * Math.sin(2 * PI * 5 * t));
-      return (harp + bass + organ) * Math.min(1, t / 0.05, (total - t) / 0.05);
+      const bi = Math.min(Math.floor(t / bar), T.chords.length - 1), ch = T.chords[bi], tb = t - bi * bar;
+      const si = Math.min(Math.floor(tb / step), T.steps - 1), ts = tb - si * step;
+      let v = 0;
+      // Melodie: bei Pausen (-1) klingt der vorige Ton weiter aus
+      let k = si; while (k > 0 && T.pat[k] < 0) k--;
+      if (T.pat[k] >= 0) v += lead(hz(ch[T.pat[k]] + T.oct), tb - k * step);
+      const bf = hz(ch[0] - 24);
+      if (T.bass === 'quarter') { const tq = tb % (step * 4); v += (Math.sin(2 * PI * bf * tq) + 0.3 * Math.sin(4 * PI * bf * tq)) * Math.exp(-tq * 3) * 0.45; }
+      else if (T.bass === 'half') { const tq = tb % (step * 8); v += Math.sin(2 * PI * bf * tq) * Math.exp(-tq * 1.2) * 0.4; }
+      else if (T.bass === 'whole') { v += (Math.sin(2 * PI * bf * tb) + 0.5 * Math.sin(2 * PI * bf * 2 * tb)) * Math.min(1, tb * 4) * Math.exp(-tb * 0.5) * 0.3; }
+      else if (T.bass === 'waltz') {
+        const beat = Math.floor(si / 4), tq = tb - beat * step * 4;
+        if (beat === 0) v += Math.sin(2 * PI * bf * tq) * Math.exp(-tq * 4) * 0.45;
+        else for (const n of ch) v += Math.sin(2 * PI * hz(n) * tq) * Math.exp(-tq * 9) * 0.09;
+      }
+      let pad = 0; for (const n of ch) pad += Math.sin(2 * PI * hz(n) * t) + 0.4 * Math.sin(4 * PI * hz(n) * t);
+      v += pad * T.pad * (0.8 + 0.2 * Math.sin(2 * PI * 5 * t));
+      if (T.bellBar) v += INSTR.bell(hz(ch[0] - 12), tb) * 0.8;
+      if (T.crickets) { const c = t % 1.7; if (c < 0.12) v += Math.sin(2 * PI * 4300 * t) * (Math.sin(2 * PI * 55 * t) > 0 ? 1 : 0) * 0.035; }
+      return v * Math.min(1, t / 0.05, (total - t) / 0.05);
     } };
   }
-  // erzeugt die Musik in kleinen Stücken, damit das Spiel dabei nicht ruckelt
-  function buildMusicAsync(done) {
-    const { total, f } = musicSampler(), sr = ac.sampleRate, n = Math.floor(total * sr);
+  // erzeugt Musik in kleinen Stücken, damit das Spiel dabei nicht ruckelt
+  function buildMusicAsync(id, done) {
+    const { total, f } = musicSampler(id), sr = ac.sampleRate, n = Math.floor(total * sr);
     const b = ac.createBuffer(1, n, sr), d = b.getChannelData(0);
     let i = 0;
     const step = () => {
@@ -315,6 +351,24 @@ const Sfx = (() => {
       if (i < n) setTimeout(step, 8); else done(b);
     };
     step();
+  }
+  const songs = {}; let track = (['hall', 'forest', 'class', 'grave'])[load('scene') || 0] || 'hall', current = null, building = {};
+  function startTrack(id) {
+    track = id;
+    if (!ac) return;
+    const go = buf => {
+      if (track !== id) return;
+      const now = ac.currentTime;
+      if (current) { const old = current; old.g.gain.setTargetAtTime(0, now, 0.4); setTimeout(() => { try { old.src.stop(); } catch (e) {} }, 2500); }
+      const g = ac.createGain(); g.gain.value = 0; g.connect(musicGain);
+      const src = ac.createBufferSource(); src.buffer = buf; src.loop = true; src.connect(g); src.start();
+      g.gain.setTargetAtTime(1, now, 0.5);
+      current = { src, g };
+    };
+    if (songs[id]) return go(songs[id]);
+    if (building[id]) return;
+    building[id] = true;
+    buildMusicAsync(id, buf => { songs[id] = buf; building[id] = false; go(buf); });
   }
   function unlock() {
     if (ac) { if (ac.state === 'suspended') ac.resume(); return; }
@@ -325,9 +379,7 @@ const Sfx = (() => {
       ready = true;
       musicGain = ac.createGain(); musicGain.gain.value = musicOn ? 0.22 : 0; musicGain.connect(master);
       // Musik erst nach dem Tipp erzeugen, damit das Greifen nicht ruckelt
-      setTimeout(() => buildMusicAsync(buf => {
-        const src = ac.createBufferSource(); src.buffer = buf; src.loop = true; src.connect(musicGain); src.start();
-      }), 600);
+      setTimeout(() => startTrack(track), 600);
     } catch (e) { ac = null; }
   }
   function play(name, vol = 1, gap = 0.04) {
@@ -344,7 +396,7 @@ const Sfx = (() => {
     if (musicGain) musicGain.gain.value = musicOn ? 0.22 : 0;
     return musicOn;
   }
-  return { unlock, play, toggleMusic, get musicOn() { return musicOn; } };
+  return { unlock, play, toggleMusic, setTrack: startTrack, get musicOn() { return musicOn; } };
 })();
 const buzz = ms => { try { navigator.vibrate && navigator.vibrate(ms); } catch (e) {} };
 
@@ -381,53 +433,208 @@ function buildStatics() {
   Composite.add(world, statics);
 }
 
-function buildBackground() {
-  bgCanvas.width = Math.round(W * S * dpr); bgCanvas.height = Math.round(H * S * dpr);
-  const c = bgCanvas.getContext('2d'); c.setTransform(dpr * S, 0, 0, dpr * S, 0, 0);
-  const g = c.createLinearGradient(0, 0, 0, H); g.addColorStop(0, '#1B0B26'); g.addColorStop(1, '#3A1650');
-  c.fillStyle = g; c.fillRect(0, 0, W, H);
-  // Spinde
+// ---------------------------------------------------------------- Szenen
+const SCENES = [
+  { id: 'hall', emoji: '🏫', name: { de: 'Schulflur', en: 'Hallway', hu: 'Folyosó' } },
+  { id: 'forest', emoji: '🌲', name: { de: 'Gruselwald', en: 'Spooky forest', hu: 'Kísértetes erdő' } },
+  { id: 'class', emoji: '📚', name: { de: 'Klassenzimmer', en: 'Classroom', hu: 'Osztályterem' } },
+  { id: 'grave', emoji: '🪦', name: { de: 'Friedhof', en: 'Graveyard', hu: 'Temető' } },
+];
+let sceneIdx = Math.min(SCENES.length - 1, Math.max(0, load('scene') || 0));
+const scene = () => SCENES[sceneIdx].id;
+const sceneName = sc => sc.name[lang] || sc.name.en;
+function setScene(i) {
+  sceneIdx = (i + SCENES.length) % SCENES.length; save('scene', sceneIdx);
+  buildBackground(); Sfx.setTrack(scene()); renderTop(); renderMenu();
+  toast(SCENES[sceneIdx].emoji + ' ' + sceneName(SCENES[sceneIdx]));
+}
+
+// Hilfen für die Kulissen (zufällig, aber pro Szene immer gleich)
+function seeded(seed) { let x = seed; return () => { x = (x * 16807) % 2147483647; return (x - 1) / 2147483646; }; }
+function sky(c, top, bottom) { const g = c.createLinearGradient(0, 0, 0, H); g.addColorStop(0, top); g.addColorStop(1, bottom); c.fillStyle = g; c.fillRect(0, 0, W, H); }
+function moon(c, x, y, r, bg) { ell(c, x, y, r * 2, r * 2, '#FFF1B8'); if (bg) ell(c, x - r * 0.5, y - r * 0.25, r * 1.8, r * 1.8, bg); }
+function stars(c, n, maxY, seed) { const R = seeded(seed); for (let i = 0; i < n; i++) ell(c, R() * W, R() * maxY, 2.5, 2.5, `rgba(255,240,200,${0.3 + R() * 0.6})`); }
+function title(c, color) {
+  c.font = `${Math.min(64, W / 14)}px Creepster, Chalkduster, fantasy`; c.fillStyle = color;
+  c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText(tr('title'), W / 2, 90);
+}
+const GY = () => H - FLOOR;   // Bodenhöhe
+
+function drawHall(c) {
+  sky(c, '#1B0B26', '#3A1650');
   const cols = ['#E0207F', '#141014', '#38D1C1', '#141014'], syms = ['☠', '♥', '🦇', '☾'];
   c.globalAlpha = 0.5;
   for (let x = 0, i = 0; x < W; x += 60, i++) {
-    rr(c, x + 30, H - FLOOR - 115, 58, 230, 3, cols[i % 4], '#0A0A0A', 3);
-    for (const y of [-90, -82, -74, -66]) segs(c, [[x + 14, H - FLOOR - 115 + y, x + 46, H - FLOOR - 115 + y]], 'rgba(255,255,255,.5)', 2);
-    ell(c, x + 48, H - FLOOR - 115, 6, 6, '#FFFFFF');
-    if (i % 3 === 0) txt(c, syms[i % 4], x + 30, H - FLOOR - 145, 20, '#FFFFFF', '20px system-ui');
+    rr(c, x + 30, GY() - 115, 58, 230, 3, cols[i % 4], '#0A0A0A', 3);
+    for (const y of [-90, -82, -74, -66]) segs(c, [[x + 14, GY() - 115 + y, x + 46, GY() - 115 + y]], 'rgba(255,255,255,.5)', 2);
+    ell(c, x + 48, GY() - 115, 6, 6, '#FFFFFF');
+    if (i % 3 === 0) txt(c, syms[i % 4], x + 30, GY() - 145, 20, '#FFFFFF', '20px system-ui');
   }
   c.globalAlpha = 1;
-  // Mond & Netz
-  ell(c, W - 130, 120, 90, 90, '#FFF1B8'); ell(c, W - 154, 108, 80, 80, '#1F0C2C');
+  moon(c, W - 130, 120, 45, '#1F0C2C');
   const web = [];
   for (let a = 0; a <= PI / 2 + 0.01; a += PI / 10) web.push([0, 0, Math.cos(a) * 170, Math.sin(a) * 170]);
   for (const r of [40, 80, 120, 160]) for (let a = 0; a < PI / 2 - 0.01; a += PI / 10)
     web.push([Math.cos(a) * r, Math.sin(a) * r, Math.cos(a + PI / 10) * r, Math.sin(a + PI / 10) * r]);
   segs(c, web, 'rgba(255,255,255,.3)', 1.2);
-  // Titel
-  c.font = `${Math.min(64, W / 14)}px Creepster, Chalkduster, fantasy`; c.fillStyle = 'rgba(255,79,163,.55)';
-  c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText(tr('title'), W / 2, 90);
-  // Boden
+  title(c, 'rgba(255,79,163,.55)');
   for (let row = 0; row * 20 < FLOOR; row++) for (let x = 0, col = 0; x < W; x += 20, col++) {
-    c.fillStyle = (row + col) % 2 ? '#FF4FA3' : '#141014'; c.fillRect(x, H - FLOOR + row * 20, 20, 20);
+    c.fillStyle = (row + col) % 2 ? '#FF4FA3' : '#141014'; c.fillRect(x, GY() + row * 20, 20, 20);
   }
 }
 
-function drawFixtures(c, t) {
-  // Trampolin
+function drawForest(c) {
+  sky(c, '#07141A', '#17352B');
+  stars(c, 60, H * 0.4, 7);
+  moon(c, W * 0.78, 110, 50);
+  const R = seeded(42);
+  // drei Ebenen Tannen-Silhouetten, hinten heller
+  const layers = [['#1C3B37', 0.55, 160], ['#14302A', 0.72, 210], ['#0C211C', 0.9, 260]];
+  for (const [col, base, hgt] of layers) {
+    for (let x = -40; x < W + 60; x += 46 + R() * 40) {
+      const h = hgt * (0.7 + R() * 0.5), y = GY() - (1 - base) * 120;
+      poly(c, [[x - h * 0.28, y], [x, y - h], [x + h * 0.28, y]], col, null, 0);
+    }
+  }
+  // knorriger Baum mit leuchtenden Augen
+  const tx = W * 0.5;
+  poly(c, [[tx - 40, GY()], [tx - 22, GY() - 230], [tx - 70, GY() - 300], [tx - 14, GY() - 260], [tx + 4, GY() - 330], [tx + 18, GY() - 250], [tx + 70, GY() - 290], [tx + 26, GY() - 220], [tx + 42, GY()]], '#24130E', null, 0);
+  ell(c, tx - 8, GY() - 170, 14, 9, '#FFE066'); ell(c, tx + 12, GY() - 170, 14, 9, '#FFE066');
+  ell(c, tx - 8, GY() - 170, 4, 7, INK); ell(c, tx + 12, GY() - 170, 4, 7, INK);
+  // Pilze und Büsche
+  for (let i = 0; i < 9; i++) { const x = R() * W; ell(c, x, GY() - 6, 30 + R() * 40, 22, '#0F2A1F'); }
+  for (let i = 0; i < 6; i++) { const x = 30 + R() * (W - 60); rr(c, x, GY() - 7, 5, 14, 2, '#E9D9B0', null, 0); ell(c, x, GY() - 15, 16, 9, i % 2 ? '#FF4FA3' : '#9D7BFF'); }
+  title(c, 'rgba(140,255,79,.35)');
+  // Waldboden
+  c.fillStyle = '#2B1B12'; c.fillRect(0, GY(), W, FLOOR);
+  c.fillStyle = '#2F5A2A'; c.fillRect(0, GY(), W, 8);
+  const blades = []; for (let x = 0; x < W; x += 7) blades.push([x, GY() + 4, x + 3, GY() - 6 - R() * 6]);
+  segs(c, blades, '#3E7A35', 2);
+}
+
+function drawClass(c) {
+  sky(c, '#2A1B3D', '#3D2752');
+  // Holzvertäfelung unten
+  c.fillStyle = '#4A2E25'; c.fillRect(0, GY() - 120, W, 120);
+  segs(c, [[0, GY() - 120, W, GY() - 120]], '#2B1A14', 4);
+  for (let x = 40; x < W; x += 80) segs(c, [[x, GY() - 118, x, GY()]], 'rgba(0,0,0,.25)', 2);
+  // Tafel mit Kreide-Titel
+  const bw = Math.min(W * 0.55, 620), bx = W * 0.42, by = GY() - 300;
+  rr(c, bx, by, bw + 24, 190, 6, '#7A4A2B', '#3A2214', 3);
+  rr(c, bx, by, bw, 166, 4, '#1F3B2D', null, 0);
+  c.font = `${Math.min(52, bw / 11)}px Creepster, Chalkduster, fantasy`; c.fillStyle = 'rgba(255,255,255,.85)';
+  c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText(tr('title'), bx, by - 30);
+  txt(c, '1 + 1 = 👻    🕷 × 8 = ?', bx, by + 30, 22, 'rgba(255,255,255,.7)', '22px Chalkduster, "Comic Sans MS", cursive');
+  rr(c, bx, by + 92, bw * 0.6, 8, 3, '#5A3A22', null, 0);
+  ell(c, bx - bw * 0.2, by + 86, 20, 7, '#FFFFFF');
+  // Fenster mit Mond
+  const wx = W * 0.88;
+  rr(c, wx, GY() - 300, 120, 160, 4, '#0E0820', '#7A4A2B', 6);
+  moon(c, wx + 18, GY() - 330, 22, '#0E0820');
+  segs(c, [[wx, GY() - 380, wx, GY() - 220], [wx - 60, GY() - 300, wx + 60, GY() - 300]], '#7A4A2B', 5);
+  // Uhr
+  ell(c, W * 0.08, 90, 60, 60, '#F6EAF8', INK, 4); segs(c, [[W * 0.08, 90, W * 0.08, 70], [W * 0.08, 90, W * 0.08 + 14, 96]], INK, 3);
+  // Schultische im Hintergrund
+  c.globalAlpha = 0.45;
+  for (let x = 90; x < W; x += 210) { rr(c, x, GY() - 66, 120, 10, 3, '#8A5A3A', null, 0); segs(c, [[x - 50, GY() - 60, x - 50, GY()], [x + 50, GY() - 60, x + 50, GY()]], '#5A3A22', 6); }
+  c.globalAlpha = 1;
+  // Holzdielen
+  c.fillStyle = '#6B4430'; c.fillRect(0, GY(), W, FLOOR);
+  for (let y = GY(); y < H; y += 10) segs(c, [[0, y, W, y]], 'rgba(0,0,0,.25)', 1);
+  for (let x = 0, r = 0; x < W; x += 70, r++) segs(c, [[x + (r % 2) * 35, GY(), x + (r % 2) * 35, H]], 'rgba(0,0,0,.2)', 1);
+}
+
+function drawGrave(c) {
+  sky(c, '#160E26', '#3B2C4A');
+  stars(c, 50, H * 0.35, 11);
+  moon(c, W * 0.2, 120, 60);
+  const R = seeded(5);
+  // Hügel
+  c.fillStyle = '#251B33'; c.beginPath(); c.moveTo(0, GY()); c.quadraticCurveTo(W * 0.3, GY() - 160, W * 0.6, GY() - 60); c.quadraticCurveTo(W * 0.8, GY() - 140, W, GY() - 40); c.lineTo(W, GY()); c.fill();
+  // Zaun
+  const fence = []; for (let x = 0; x < W; x += 22) fence.push([x, GY() - 30, x, GY() - 90]);
+  fence.push([0, GY() - 75, W, GY() - 75], [0, GY() - 45, W, GY() - 45]);
+  segs(c, fence, '#140C1E', 4);
+  for (let x = 0; x < W; x += 22) poly(c, [[x - 5, GY() - 88], [x, GY() - 100], [x + 5, GY() - 88]], '#140C1E', null, 0);
+  // kahler Baum
+  const tx = W * 0.62;
+  segs(c, [[tx, GY(), tx, GY() - 210], [tx, GY() - 150, tx - 70, GY() - 230], [tx, GY() - 180, tx + 60, GY() - 260], [tx - 40, GY() - 200, tx - 60, GY() - 260], [tx + 30, GY() - 220, tx + 80, GY() - 230]], '#140C1E', 10);
+  // Grabsteine
+  for (let i = 0; i < 7; i++) {
+    const x = 60 + i * (W - 120) / 6 + (R() - 0.5) * 40, h = 60 + R() * 40;
+    if (Math.abs(x - W * 0.16) < 110 || Math.abs(x - W * 0.84) < 90) continue;   // Platz für die Spielgeräte
+    pathRR(c, x, GY() - h / 2, 46, h, 18); paint(c, '#6E6A80', '#2E2A3A', 3);
+    txt(c, i % 2 ? 'RIP' : '✝', x, GY() - h + 26, 14, '#2E2A3A');
+  }
+  title(c, 'rgba(185,166,255,.4)');
+  // Nebel
+  for (let i = 0; i < 10; i++) ell(c, R() * W, GY() - 10 - R() * 30, 160 + R() * 120, 30, 'rgba(220,210,255,.07)');
+  c.fillStyle = '#2A2018'; c.fillRect(0, GY(), W, FLOOR);
+  c.fillStyle = '#3A4A2A'; c.fillRect(0, GY(), W, 6);
+}
+
+const SCENE_DRAW = { hall: drawHall, forest: drawForest, class: drawClass, grave: drawGrave };
+function buildBackground() {
+  bgCanvas.width = Math.round(W * S * dpr); bgCanvas.height = Math.round(H * S * dpr);
+  const c = bgCanvas.getContext('2d'); c.setTransform(dpr * S, 0, 0, dpr * S, 0, 0);
+  SCENE_DRAW[scene()](c);
+}
+
+// Spielgeräte: gleiche Physik, Aussehen je nach Szene
+const FX = {
+  hall: { bubble: '#8CFF4F' }, forest: { bubble: '#C6FF7A' }, class: { bubble: '#D9A6FF' }, grave: { bubble: '#9FD8FF' },
+};
+function drawFixtures(c) {
+  const sc = scene();
   const wx = webBody.position.x, wy = webBody.position.y, wob = Math.sin(webWobble * 30) * webWobble * 40;
-  for (const x of [-85, 85]) rr(c, wx + x, wy + 25, 8, 70, 3, INK, '#FF4FA3', 1.5);
-  const s = [[wx - 80, wy, wx + 80, wy]];
-  for (let x = -70; x <= 70; x += 20) s.push([wx + x, wy, wx + x * 0.6, wy + 14 + wob]);
-  s.push([wx - 48, wy + 14 + wob, wx + 48, wy + 14 + wob]);
-  segs(c, s, '#FFFFFF', 2);
-  txt(c, '🕷', wx + 60, wy + 26 + wob, 18, '#FFF', '18px system-ui');
-  // Kessel
+  if (sc === 'hall' || sc === 'grave') {
+    if (sc === 'hall') for (const x of [-85, 85]) rr(c, wx + x, wy + 25, 8, 70, 3, INK, '#FF4FA3', 1.5);
+    else for (const x of [-92, 92]) { pathRR(c, wx + x, wy + 20, 34, 84, 14); paint(c, '#7A7690', '#2E2A3A', 3); txt(c, '✝', wx + x, wy + 4, 14, '#2E2A3A'); }
+    const s = [[wx - 80, wy, wx + 80, wy]];
+    for (let x = -70; x <= 70; x += 20) s.push([wx + x, wy, wx + x * 0.6, wy + 14 + wob]);
+    s.push([wx - 48, wy + 14 + wob, wx + 48, wy + 14 + wob]);
+    segs(c, s, '#FFFFFF', 2);
+    txt(c, '🕷', wx + 60, wy + 26 + wob, 18, '#FFF', '18px system-ui');
+  } else if (sc === 'forest') {
+    // Riesenpilz: Hut federt
+    rr(c, wx, wy + 30, 38, 62, 12, '#E9D9B0', '#8A7A5A', 2);
+    c.save(); c.translate(wx, wy + 2 + wob * 0.4); c.scale(1 + webWobble * 0.3, 1 - webWobble * 0.4);
+    c.beginPath(); c.ellipse(0, 0, 86, 34, 0, PI, 2 * PI); c.closePath(); paint(c, '#C2185B', '#5A0A2A', 3);
+    for (const [dx, dy, r] of [[-45, -14, 9], [-10, -24, 11], [30, -16, 8], [58, -6, 6], [-66, -4, 6]]) ell(c, dx, dy, r * 2, r * 1.6, '#FFF3D6');
+    c.restore();
+  } else {
+    // Turnmatte mit Sprungfedern
+    const sp = []; for (let x = -60; x <= 60; x += 30) { for (let k = 0; k < 4; k++) sp.push([wx + x - 6, wy + 10 + k * 11 + wob * 0.2, wx + x + 6, wy + 15 + k * 11 + wob * 0.2]); }
+    segs(c, sp, '#B0B0B8', 3);
+    rr(c, wx, wy + wob * 0.4, 170, 16, 6, '#3B6FD8', '#1A3A8A', 2.5);
+    segs(c, [[wx - 70, wy + wob * 0.4, wx + 70, wy + wob * 0.4]], 'rgba(255,255,255,.5)', 2);
+  }
+  // Schleuder (Kessel / Baumstumpf / Becherglas / Brunnen)
   const { x, y } = cauldron;
-  poly(c, [[x - 55, y - 90], [x + 55, y - 90], [x + 48, y - 20], [x + 30, y], [x - 30, y], [x - 48, y - 20]], '#1A1A1A', '#8CFF4F', 3);
-  ell(c, x, y - 88, 104, 20, '#8CFF4F', '#3FA81E', 2);
-  rr(c, x, y - 92, 122, 12, 6, null, '#444444', 4);
-  txt(c, 'BLUBB', x, y - 45, 12, '#8CFF4F');
-  if (Math.random() < 0.08) particles.push({ x: x + rnd(-40, 40), y: y - 90, vx: 0, vy: -rnd(0.5, 1.2), life: 1, r: 5, color: '#8CFF4F' });
+  if (sc === 'hall') {
+    poly(c, [[x - 55, y - 90], [x + 55, y - 90], [x + 48, y - 20], [x + 30, y], [x - 30, y], [x - 48, y - 20]], '#1A1A1A', '#8CFF4F', 3);
+    ell(c, x, y - 88, 104, 20, '#8CFF4F', '#3FA81E', 2);
+    rr(c, x, y - 92, 122, 12, 6, null, '#444444', 4);
+    txt(c, 'BLUBB', x, y - 45, 12, '#8CFF4F');
+  } else if (sc === 'forest') {
+    poly(c, [[x - 58, y], [x - 52, y - 90], [x + 52, y - 90], [x + 58, y]], '#5A3A22', '#2B1A10', 3);
+    segs(c, [[x - 30, y - 80, x - 34, y - 10], [x + 6, y - 84, x + 2, y - 8], [x + 34, y - 78, x + 38, y - 12]], '#3A2414', 3);
+    ell(c, x, y - 90, 104, 22, '#8A5A3A', '#2B1A10', 3); ell(c, x, y - 90, 80, 14, '#C6FF7A');
+  } else if (sc === 'class') {
+    poly(c, [[x - 50, y - 96], [x + 50, y - 96], [x + 50, y - 6], [x + 42, y], [x - 42, y], [x - 50, y - 6]], 'rgba(220,240,255,.18)', '#DDE8F0', 3);
+    poly(c, [[x - 48, y - 60], [x + 48, y - 60], [x + 48, y - 6], [x + 42, y - 2], [x - 42, y - 2], [x - 48, y - 6]], 'rgba(157,123,255,.75)', null, 0);
+    for (const yy of [-80, -60, -40, -20]) segs(c, [[x + 36, y + yy, x + 48, y + yy]], '#DDE8F0', 2);
+    txt(c, '🧪', x - 30, y - 110, 22, '#fff', '22px system-ui');
+  } else {
+    poly(c, [[x - 56, y], [x - 56, y - 70], [x + 56, y - 70], [x + 56, y]], '#5E5A70', '#2E2A3A', 3);
+    for (let yy = -60; yy < 0; yy += 18) for (let xx = -48 + (yy % 36 ? 14 : 0); xx < 50; xx += 28) rr(c, x + xx, y + yy + 9, 24, 14, 2, null, '#2E2A3A', 1.5);
+    ell(c, x, y - 70, 110, 20, '#9FD8FF', '#2E2A3A', 3);
+    segs(c, [[x - 50, y - 70, x - 50, y - 130], [x + 50, y - 70, x + 50, y - 130], [x - 60, y - 130, x + 60, y - 130]], '#3A2A20', 6);
+  }
+  if (Math.random() < 0.08) particles.push({ x: x + rnd(-40, 40), y: y - 90, vx: 0, vy: -rnd(0.5, 1.2), life: 1, r: 5, color: FX[sc].bubble });
+  // Stimmung: Glühwürmchen im Wald, Geister-Irrlichter auf dem Friedhof
+  if (sc === 'forest' && Math.random() < 0.05) particles.push({ x: rnd(0, W), y: rnd(H * 0.3, GY() - 20), vx: rnd(-0.3, 0.3), vy: rnd(-0.3, 0.1), life: 1, r: 2.5, color: '#E8FF7A' });
+  if (sc === 'grave' && Math.random() < 0.03) particles.push({ x: rnd(0, W), y: GY() - rnd(10, 60), vx: rnd(-0.4, 0.4), vy: -0.2, life: 1, r: 4, color: 'rgba(159,216,255,.8)' });
 }
 
 // ---------------------------------------------------------------- Figuren & Gegenstände
@@ -698,6 +905,7 @@ function resize() {
 
 // ---------------------------------------------------------------- Bedienelemente
 function renderTop() {
+  $('bScene').textContent = SCENES[sceneIdx].emoji; $('bScene').setAttribute('aria-label', sceneName(SCENES[sceneIdx]));
   $('bGrav').textContent = GRAV[gravMode][2]; $('bGrav').setAttribute('aria-label', tr('a11y.gravity'));
   $('bMusic').textContent = Sfx.musicOn ? '🔊' : '🔇'; $('bMusic').setAttribute('aria-label', tr('a11y.music'));
   $('bMenu').setAttribute('aria-label', tr('settings'));
@@ -722,9 +930,11 @@ function renderDock() {
 }
 function renderMenu() {
   const m = $('menu');
-  m.innerHTML = `<h4>${tr('lang')}</h4>` + LANGS.map(([k, l]) => `<button class="mitem${k === lang ? ' on' : ''}" data-lang="${k}">${l}</button>`).join('')
+  m.innerHTML = `<h4>${tr('scenes')}</h4>` + SCENES.map((sc, i) => `<button class="mitem${i === sceneIdx ? ' on' : ''}" data-scene="${i}">${sc.emoji} ${sceneName(sc)}</button>`).join('')
+    + `<h4>${tr('lang')}</h4>` + LANGS.map(([k, l]) => `<button class="mitem${k === lang ? ' on' : ''}" data-lang="${k}">${l}</button>`).join('')
     + `<button class="mitem danger" id="mClear">${tr('btn.clear')}</button>`
     + `<h4 style="text-align:right;margin-top:4px">Version ${VERSION}</h4>`;
+  m.querySelectorAll('[data-scene]').forEach(b => b.onclick = () => { Sfx.unlock(); setScene(+b.dataset.scene); m.hidden = true; });
   m.querySelectorAll('[data-lang]').forEach(b => b.onclick = () => { setLang(b.dataset.lang); m.hidden = true; });
   $('mClear').onclick = () => { m.hidden = true; confirmBox(tr('clear.q'), '', tr('btn.clear'), clearAll); };
 }
@@ -732,6 +942,7 @@ function setLang(l) { lang = l; save('lang', l); document.documentElement.lang =
 function renderAll() { renderTop(); renderDock(); renderMenu(); }
 
 $('bGrav').onclick = () => { Sfx.unlock(); cycleGravity(); };
+$('bScene').onclick = () => { Sfx.unlock(); setScene(sceneIdx + 1); };
 $('bMusic').onclick = () => { Sfx.unlock(); toast(tr(Sfx.toggleMusic() ? 'music.on' : 'music.off')); renderTop(); };
 $('bMenu').onclick = e => { e.stopPropagation(); renderMenu(); $('menu').hidden = !$('menu').hidden; };
 document.addEventListener('pointerdown', e => { if (!$('menu').hidden && !$('menu').contains(e.target) && e.target !== $('bMenu')) $('menu').hidden = true; });

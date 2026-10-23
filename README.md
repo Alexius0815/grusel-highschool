@@ -5,6 +5,7 @@ im Hexenkessel hochschleudern – und eigene Monster gestalten. Läuft im Browse
 
 ## Funktionen
 - Physik mit [Matter.js](https://brm.io/matter-js/) – Ziehen und Werfen, auch mit mehreren Fingern gleichzeitig
+- 4 Orte mit eigener Kulisse, eigenen Spielgeräten und eigener Musik: Schulflur, Gruselwald, Klassenzimmer, Friedhof
 - 6 Start-Figuren + **Erstellungsmodus**: Name, Monsterart, Haut-, Haar- und Augenfarbe, Frisur, Kleidung, Schuhe, Accessoires
 - Löschen mit Rückfrage und Wiederherstellen
 - Schwerkraft-Modi (normal, Mond, schwerelos, verkehrt herum)
@@ -22,7 +23,7 @@ Lokal testen: `python3 -m http.server` im Ordner starten und `http://localhost:8
 ## Steuerung
 - Figur oder Gegenstand antippen und ziehen, loslassen = werfen
 - Doppelt auf einen Patchwork-Zombie tippen (Maus: Rechtsklick) → die Nähte platzen
-- Oben rechts: Schwerkraft, Musik, Einstellungen (Sprache, Aufräumen)
+- Oben rechts: Ort wechseln, Schwerkraft, Musik, Einstellungen (Sprache, Aufräumen)
 
 ## Lizenz & Hinweise
 Code: MIT. Matter.js © Liam Brummitt, MIT-Lizenz.
