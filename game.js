@@ -2,6 +2,7 @@
 (() => {
 'use strict';
 const { Engine, Bodies, Body, Composite, Constraint, Events, Query } = Matter;
+const VERSION = 6;
 const $ = id => document.getElementById(id);
 const PI = Math.PI, rnd = (a, b) => a + Math.random() * (b - a), pick = a => a[Math.floor(Math.random() * a.length)];
 
@@ -722,7 +723,8 @@ function renderDock() {
 function renderMenu() {
   const m = $('menu');
   m.innerHTML = `<h4>${tr('lang')}</h4>` + LANGS.map(([k, l]) => `<button class="mitem${k === lang ? ' on' : ''}" data-lang="${k}">${l}</button>`).join('')
-    + `<button class="mitem danger" id="mClear">${tr('btn.clear')}</button>`;
+    + `<button class="mitem danger" id="mClear">${tr('btn.clear')}</button>`
+    + `<h4 style="text-align:right;margin-top:4px">Version ${VERSION}</h4>`;
   m.querySelectorAll('[data-lang]').forEach(b => b.onclick = () => { setLang(b.dataset.lang); m.hidden = true; });
   $('mClear').onclick = () => { m.hidden = true; confirmBox(tr('clear.q'), '', tr('btn.clear'), clearAll); };
 }
