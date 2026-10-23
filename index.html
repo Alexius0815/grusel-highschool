@@ -1,0 +1,195 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<title>Grusel-Highschool</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#12061A">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-512.png">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Creepster&family=Nunito:wght@600;800;900&display=swap">
+<style>
+/* Layout: Spielfeld oben (flex 1), feste Leiste darunter; Dialoge als Overlays. Bewusst nur ein dunkles Thema (Spielwelt). */
+:root {
+  --night: #1B0B26;
+  --panel: #12061A;
+  --card: #241233;
+  --pink: #FF4FA3;
+  --mint: #9FE3C8;
+  --ink: #F6EAF8;
+  --muted: #B8A3C7;
+  --line: rgba(255,255,255,.14);
+  --danger: #FF5C6C;
+  --font-ui: "Nunito", ui-rounded, "SF Pro Rounded", system-ui, sans-serif;
+  --font-display: "Creepster", "Chalkduster", fantasy, cursive;
+  color-scheme: dark;
+}
+[hidden] { display: none !important; }
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+html, body { height: 100%; margin: 0; background: var(--panel); color: var(--ink); font-family: var(--font-ui); overflow: hidden; user-select: none; -webkit-user-select: none; touch-action: none; }
+button { font: inherit; color: inherit; cursor: pointer; border: 0; background: none; }
+button:focus-visible, input:focus-visible { outline: 3px solid var(--mint); outline-offset: 2px; }
+
+#app { height: 100%; display: flex; flex-direction: column; }
+#stage { position: relative; flex: 1; min-height: 0; background: var(--night); }
+#game { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+
+/* runde Knöpfe oben rechts */
+#top { position: absolute; top: calc(12px + env(safe-area-inset-top, 0px)); right: calc(12px + env(safe-area-inset-right, 0px)); display: flex; gap: 10px; z-index: 5; }
+.round { width: 52px; height: 52px; border-radius: 50%; display: grid; place-items: center; font-size: 24px; background: rgba(18,6,26,.6); border: 1px solid var(--line); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); transition: transform .15s; }
+.round:active, .tile:active, .prop:active { transform: scale(.88); }
+
+#menu { position: absolute; top: calc(72px + env(safe-area-inset-top, 0px)); right: calc(12px + env(safe-area-inset-right, 0px)); z-index: 6; width: 250px; padding: 10px; border-radius: 18px; background: rgba(28,12,40,.96); border: 1px solid var(--line); box-shadow: 0 12px 40px rgba(0,0,0,.5); display: grid; gap: 6px; }
+#menu h4 { margin: 6px 8px 2px; font-size: 13px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+.mitem { text-align: left; padding: 12px 14px; border-radius: 12px; font-weight: 800; font-size: 17px; }
+.mitem:hover { background: rgba(255,255,255,.06); }
+.mitem.on { background: rgba(255,79,163,.22); }
+.mitem.danger { color: var(--danger); }
+
+#toast { position: absolute; top: calc(14px + env(safe-area-inset-top, 0px)); left: 50%; transform: translate(-50%, -10px); padding: 9px 20px; border-radius: 999px; background: rgba(18,6,26,.88); border: 1.5px solid rgba(255,79,163,.8); font-weight: 900; font-size: 18px; opacity: 0; transition: opacity .15s, transform .15s; pointer-events: none; white-space: nowrap; z-index: 4; }
+#toast.show { opacity: 1; transform: translate(-50%, 0); }
+
+/* Leiste unter dem Spielfeld */
+#dock { flex: none; display: flex; gap: 12px; align-items: center; background: var(--panel); border-top: 1px solid rgba(255,79,163,.6); padding-block: 8px calc(6px + env(safe-area-inset-bottom, 0px)); padding-left: max(12px, env(safe-area-inset-left, 0px)); padding-right: max(12px, env(safe-area-inset-right, 0px)); }
+#roster { flex: 1; min-width: 0; display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; touch-action: pan-x; }
+#roster::-webkit-scrollbar { display: none; }
+.tile { flex: none; width: 68px; display: grid; justify-items: center; gap: 2px; transition: transform .15s; }
+.tile canvas, .tile .plus { width: 52px; height: 52px; border-radius: 50%; }
+.tile .plus { display: grid; place-items: center; background: var(--pink); font-size: 32px; font-weight: 900; color: #fff; }
+.tile span { font-size: 12px; font-weight: 800; max-width: 66px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#props { flex: none; display: flex; gap: 6px; padding-left: 12px; border-left: 1px solid var(--line); }
+.prop { width: 52px; height: 52px; border-radius: 50%; font-size: 28px; background: rgba(255,255,255,.08); transition: transform .15s; }
+@media (max-width: 520px) { #dock { flex-wrap: wrap; } #props { border-left: 0; padding-left: 0; width: 100%; justify-content: space-between; } .prop { width: 46px; height: 46px; font-size: 24px; } }
+
+/* Overlays */
+.scrim { position: fixed; inset: 0; z-index: 20; background: rgba(8,2,14,.6); display: grid; place-items: center; padding: 16px; }
+.sheet { background: var(--night); border: 1px solid var(--line); border-radius: 26px; box-shadow: 0 20px 60px rgba(0,0,0,.6); }
+#coachBox { max-width: 520px; padding: 28px; text-align: center; display: grid; gap: 16px; justify-items: center; }
+#coachBox p { margin: 0; font-size: 20px; font-weight: 800; line-height: 1.35; text-wrap: balance; }
+.btn { padding: 12px 22px; border-radius: 14px; font-weight: 900; font-size: 17px; background: rgba(255,255,255,.1); }
+.btn.primary { background: var(--pink); color: #fff; }
+.btn.danger { background: var(--danger); color: #fff; }
+.btn.ghost { background: transparent; color: var(--pink); }
+
+#confirmBox { max-width: 420px; padding: 24px; display: grid; gap: 12px; text-align: center; }
+#confirmBox h3 { margin: 0; font-size: 22px; text-wrap: balance; }
+#confirmBox p { margin: 0; color: var(--muted); font-weight: 700; }
+#confirmBox .row { display: flex; gap: 10px; justify-content: center; margin-top: 8px; }
+
+/* Erstellungsmenü */
+#creator { position: fixed; inset: 0; z-index: 15; background: rgba(8,2,14,.6); display: grid; place-items: center; padding: max(16px, env(safe-area-inset-top, 0px)) max(16px, env(safe-area-inset-right, 0px)) max(16px, env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px)); }
+#cr { width: min(1000px, 100%); height: min(720px, 100%); display: flex; flex-direction: column; overflow: hidden; }
+.bar { flex: none; display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; padding: 12px 16px; border-bottom: 1px solid var(--line); }
+.bar h2 { margin: 0; font-size: 22px; font-weight: 900; text-align: center; }
+.bar .l { justify-self: start; } .bar .r { justify-self: end; }
+.crbody { flex: 1; min-height: 0; overflow: auto; padding: 20px; touch-action: pan-y; }
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 14px; }
+.card { min-height: 180px; border-radius: 22px; display: grid; justify-items: center; align-content: center; gap: 8px; padding: 12px; background: var(--card); }
+.card.new { background: transparent; border: 2px dashed var(--pink); }
+.card canvas { width: 96px; height: 96px; }
+.card .plus { width: 96px; height: 96px; border-radius: 50%; display: grid; place-items: center; background: var(--pink); color: #fff; font-size: 56px; font-weight: 900; }
+.card b { font-size: 17px; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.card .acts { display: flex; gap: 8px; }
+.ibtn { width: 44px; height: 38px; border-radius: 10px; background: rgba(255,255,255,.1); font-size: 18px; }
+.ibtn.del { color: var(--danger); }
+.empty { color: var(--muted); font-size: 18px; font-weight: 700; padding: 16px 4px; }
+.deleted { margin-top: 24px; display: grid; gap: 10px; }
+.deleted h4 { margin: 0; color: var(--muted); }
+.drow { display: flex; align-items: center; gap: 12px; }
+.drow canvas { width: 40px; height: 40px; opacity: .5; }
+.drow s { flex: 1; color: var(--muted); font-weight: 800; }
+.btn.restore { background: rgba(159,227,200,.18); color: var(--mint); padding: 8px 14px; }
+
+.editor { flex: 1; min-height: 0; display: flex; gap: 22px; padding: 20px; }
+.ed-left { flex: none; width: 260px; display: grid; gap: 12px; align-content: start; justify-items: center; }
+#pv { width: 250px; height: 300px; border-radius: 24px; background: #2A1238; }
+#name { width: 250px; padding: 12px; border-radius: 14px; border: 1px solid var(--line); background: rgba(255,255,255,.08); color: var(--ink); font: 900 22px var(--font-ui); text-align: center; user-select: text; -webkit-user-select: text; }
+.ed-right { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 14px; }
+.seg { display: flex; padding: 4px; border-radius: 14px; background: rgba(255,255,255,.08); }
+.seg button { flex: 1; padding: 10px; border-radius: 10px; font-weight: 900; font-size: 16px; color: var(--muted); }
+.seg button.on { background: var(--pink); color: #fff; }
+.panel { flex: 1; min-height: 0; overflow: auto; display: grid; gap: 20px; align-content: start; padding-right: 4px; touch-action: pan-y; }
+.group h5 { margin: 0 0 8px; font-size: 15px; font-weight: 900; }
+.chips { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 8px; }
+.chip { padding: 12px 8px; border-radius: 12px; background: rgba(255,255,255,.09); font-weight: 800; font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.chip.on { background: var(--pink); color: #fff; }
+.sw { display: flex; flex-wrap: wrap; gap: 8px; }
+.sw button { width: 44px; height: 44px; border-radius: 50%; border: 1px solid rgba(255,255,255,.35); display: grid; place-items: center; font-weight: 900; }
+.sw button.on { box-shadow: 0 0 0 3px var(--night), 0 0 0 6px var(--pink); }
+
+/* ---- Kleinere Geräte: Bedienung bleibt gut antippbar (min. ~40 px), Text & Abstände werden kompakter ---- */
+@media (max-height: 640px), (max-width: 900px) {
+  #top { gap: 8px; }
+  .round { width: 44px; height: 44px; font-size: 20px; }
+  #menu { top: calc(60px + env(safe-area-inset-top, 0px)); }
+  .mitem { padding: 10px 12px; font-size: 15px; }
+  #toast { font-size: 15px; padding: 7px 16px; }
+  #dock { gap: 8px; padding-block: 6px calc(4px + env(safe-area-inset-bottom, 0px)); }
+  .tile { width: 56px; }
+  .tile canvas, .tile .plus { width: 44px; height: 44px; }
+  .tile .plus { font-size: 26px; }
+  .tile span { font-size: 10.5px; max-width: 54px; }
+  .prop { width: 44px; height: 44px; font-size: 23px; }
+  #props { gap: 4px; padding-left: 8px; }
+  #coachBox { padding: 20px; gap: 12px; } #coachBox p { font-size: 17px; }
+  .bar { padding: 8px 12px; } .bar h2 { font-size: 18px; }
+  .btn { padding: 10px 16px; font-size: 15px; }
+  .crbody { padding: 14px; }
+  .grid { grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 10px; }
+  .card { min-height: 140px; } .card canvas, .card .plus { width: 72px; height: 72px; } .card .plus { font-size: 42px; }
+  .editor { gap: 16px; padding: 14px; }
+  .ed-left { width: 190px; gap: 8px; }
+  #pv { width: 180px; height: 216px; }
+  #name { width: 180px; font-size: 17px; padding: 8px; }
+  .panel { gap: 14px; }
+  .chips { grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); gap: 6px; }
+  .chip { padding: 10px 6px; font-size: 13.5px; }
+  .sw button { width: 38px; height: 38px; }
+  .group h5 { font-size: 13.5px; margin-bottom: 6px; }
+}
+/* Sehr flache Displays (Handy quer): Namen unter den Avataren weglassen */
+@media (max-height: 430px) {
+  .tile span { display: none; }
+  .tile { width: 48px; }
+  #dock { padding-block: 4px calc(4px + env(safe-area-inset-bottom, 0px)); }
+}
+/* Schmale Displays: Editor untereinander */
+@media (max-width: 640px) {
+  .editor { flex-direction: column; overflow: auto; }
+  .ed-left { width: 100%; grid-template-columns: auto 1fr; justify-items: start; align-items: center; }
+  #pv { width: 120px; height: 144px; grid-row: span 2; }
+  #name { width: 100%; }
+  .panel { overflow: visible; }
+}
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="stage">
+    <canvas id="game"></canvas>
+    <div id="top">
+      <button class="round" id="bGrav"></button>
+      <button class="round" id="bMusic"></button>
+      <button class="round" id="bMenu">⚙️</button>
+    </div>
+    <div id="menu" hidden></div>
+    <div id="toast"></div>
+  </div>
+  <div id="dock">
+    <div id="roster"></div>
+    <div id="props"></div>
+  </div>
+</div>
+
+<div id="coach" class="scrim" hidden><div id="coachBox" class="sheet"></div></div>
+<div id="creator" hidden><div id="cr" class="sheet"></div></div>
+<div id="confirm" class="scrim" hidden><div id="confirmBox" class="sheet"></div></div>
+
+<script src="matter.min.js"></script>
+<script src="game.js"></script>
+</body>
+</html>
