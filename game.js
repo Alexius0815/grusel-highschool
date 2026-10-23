@@ -624,7 +624,8 @@ canvas.addEventListener('pointerdown', e => {
   // greift am Berührungspunkt – oder (bei Toleranz-Treffer) am Rand nahe dem Finger
   const inside = Query.point([hit], p).length > 0;
   const gp = inside ? p : { x: hit.position.x + (p.x - hit.position.x) * 0.5, y: hit.position.y + (p.y - hit.position.y) * 0.5 };
-  const c = Constraint.create({ pointA: { x: p.x, y: p.y }, bodyB: hit, pointB: { x: gp.x - hit.position.x, y: gp.y - hit.position.y }, stiffness: 0.4, damping: 0.15, length: 0 });
+  const c = Constraint.create({ pointA: { x: p.x, y: p.y }, bodyB: hit, pointB: { x: gp.x - hit.position.x, y: gp.y - hit.position.y }, stiffness: 0.9, damping: 0.25, length: 0 });
+  Body.setVelocity(hit, { x: 0, y: 0 }); Body.setAngularVelocity(hit, hit.angularVelocity * 0.3);   // sofort „in der Hand“
   Composite.add(world, c); drags.set(e.pointerId, c);
   try { canvas.setPointerCapture(e.pointerId); } catch (_) {}
 });
